@@ -1,39 +1,4 @@
 {
-  "4": {
-    "inputs": {
-      "upscale_method": "bilinear",
-      "width": 256,
-      "height": 256,
-      "crop": "disabled",
-      "image": [ "13", 0 ]
-    },
-    "class_type": "ImageScale"
-  },
-  "5": {
-    "inputs": {
-      "colors": 24,
-      "dither": "none",
-      "image": [ "4", 0 ]
-    },
-    "class_type": "ImageQuantize"
-  },
-  "6": {
-    "inputs": {
-      "upscale_method": "nearest-exact",
-      "width": 128,
-      "height": 128,
-      "crop": "disabled",
-      "image": [ "5", 0 ]
-    },
-    "class_type": "ImageScale"
-  },
-  "7": {
-    "inputs": {
-      "filename_prefix": "PixelSprite",
-      "images": [ "23", 0 ]
-    },
-    "class_type": "SaveImage"
-  },
   "8": {
     "inputs": {
       "ckpt_name": "waiIllustriousSDXL_v130.safetensors"
@@ -65,7 +30,7 @@
   "12": {
     "inputs": {
       "seed": 1115207765856419,
-      "steps": 20,
+      "steps": 25,
       "cfg": 7,
       "sampler_name": "euler",
       "scheduler": "karras",
@@ -100,26 +65,5 @@
       "clip": [ "8", 1 ]
     },
     "class_type": "LoraLoader"
-  },
-  "21": {
-    "inputs": {
-      "upscale_method": "nearest-exact",
-      "width": 512,
-      "height": 512,
-      "crop": "disabled",
-      "image": [ "6", 0 ]
-    },
-    "class_type": "ImageScale"
-  },
-  "22": {
-    "inputs": {},
-    "class_type": "BRIA_RMBG_ModelLoader_Zho"
-  },
-  "23": {
-    "inputs": {
-      "rmbgmodel": [ "22", 0 ],
-      "image": [ "21", 0 ]
-    },
-    "class_type": "BRIA_RMBG_Zho"
   }
 }
