@@ -1,0 +1,15 @@
+# Python / Backend
+backend/venv/
+backend/__pycache__/
+backend/.env
+
+# Node / Frontend
+ai-studio-frontend/node_modules/
+ai-studio-frontend/.next/
+ai-studio-frontend/.env.local
+
+# Heavy AI Models (CRITICAL)
+**/*.safetensors
+**/*.pth
+**/*.ckpt
+**/*.pt
