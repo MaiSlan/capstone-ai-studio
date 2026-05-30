@@ -2,17 +2,52 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Supabase Auth will fire here for:", email);
-    // Next step: Wire this to Supabase!
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (isSignUp) {
+        // Handle Sign Up
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        // Supabase sends a confirmation email by default. 
+        // For testing, you might want to turn off "Confirm Email" in Supabase Auth Settings.
+        alert('Check your email for the confirmation link! (Or login directly if email confirmation is disabled in Supabase)');
+      } else {
+        // Handle Sign In
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        
+        // Push user to the protected workspace
+        router.push('/studio');
+        router.refresh();
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -33,6 +68,12 @@ export default function AuthPage() {
         <p className="text-zinc-400 text-sm text-center mb-8">
           {isSignUp ? 'Get 10 free generation tokens upon signup.' : 'Sign in to access your workspace and tokens.'}
         </p>
+
+        {error && (
+          <div className="bg-red-950/30 border border-red-900/50 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div>
@@ -58,15 +99,19 @@ export default function AuthPage() {
             />
           </div>
 
-          <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all mt-4">
-            {isSignUp ? 'Initialize Account' : 'Authenticate'}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-green-500 hover:bg-green-600 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all mt-4 disabled:opacity-50"
+          >
+            {loading ? 'Processing...' : (isSignUp ? 'Initialize Account' : 'Authenticate')}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-zinc-500">
           {isSignUp ? 'Already have access? ' : 'Need an authorization key? '}
           <button 
-            onClick={() => setIsSignUp(!isSignUp)} 
+            onClick={() => { setIsSignUp(!isSignUp); setError(null); }} 
             className="text-green-500 hover:text-green-400 font-medium transition-colors"
           >
             {isSignUp ? 'Sign In' : 'Sign Up'}
