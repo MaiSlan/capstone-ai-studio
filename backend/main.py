@@ -12,17 +12,23 @@ from langgraph.graph import StateGraph, END
 load_dotenv()
 
 # ==========================================
-# 🚀 1. INIT THE SERVER
+# 1. INIT THE SERVER (THIS MUST BE FIRST!)
+# ==========================================
+app = FastAPI(title="AI Studio Hybrid Engine")
+
+# ==========================================
+# 2. THE CORS FIX (THIS MUST BE SECOND!)
 # ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows Vercel to connect
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # ==========================================
-# 🧠 2. THE CLOUD ENGINE
+# 3. THE CLOUD ENGINE
 # ==========================================
 llm = ChatGroq(
     api_key=os.getenv("LLM_API_KEY"),
@@ -30,7 +36,7 @@ llm = ChatGroq(
 )
 
 # ==========================================
-# 📡 3. DATA MODELS
+# 4. DATA MODELS
 # ==========================================
 class ConceptRequest(BaseModel):
     theme: str
@@ -42,7 +48,7 @@ class AgentState(TypedDict):
     images: list
 
 # ==========================================
-# ⛓️ 4. THE LANGGRAPH AGENTIC PIPELINE
+# 5. THE LANGGRAPH AGENTIC PIPELINE
 # ==========================================
 def writer_node(state: AgentState):
     print(f"--> [Node 1] Cloud Writer generating lore for: {state['theme']}")
@@ -106,7 +112,7 @@ workflow.add_edge("artist", END)
 studio_app = workflow.compile()
 
 # ==========================================
-# 🎯 5. THE MASTER ENDPOINT
+# 6. THE MASTER ENDPOINT
 # ==========================================
 @app.post("/api/v1/generate-character")
 async def generate_character(req: ConceptRequest):
