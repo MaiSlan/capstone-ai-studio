@@ -106,23 +106,6 @@ export default function StudioDashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans antialiased">
-      <header className="border-b border-zinc-900 px-8 py-4 flex items-center justify-between backdrop-blur-sm sticky top-0 bg-zinc-950/80 z-50">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded bg-emerald-500 flex items-center justify-center text-zinc-950 font-bold tracking-tighter">AI</div>
-          <span className="font-medium tracking-tight text-sm">STUDIO // ENGINE v1.0</span>
-        </div>
-        <div className="flex items-center gap-4 text-xs font-medium">
-          <span className="flex items-center gap-1.5 bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-800">
-            <Cpu size={14} className={
-              gpuStatus === 'Active' ? 'text-emerald-500' :
-              gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' :
-              'text-zinc-600'
-            } />
-            Modal GPU: {gpuStatus}
-          </span>
-        </div>
-      </header>
-
       <main className="max-w-[1600px] mx-auto p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
         
         {/* COLUMN 1: History Sidebar */}
@@ -172,6 +155,18 @@ export default function StudioDashboard() {
         {/* COLUMN 2: Pipeline Controls */}
         <section className="xl:col-span-3 space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl">
+            {/* NEW: GPU Status moved to the controller header */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Pipeline Controller</h2>
+              <span className="flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border border-zinc-800">
+                <Cpu size={12} className={
+                  gpuStatus === 'Active' ? 'text-green-500' :
+                  gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' :
+                  'text-zinc-600'
+                } />
+                {gpuStatus}
+              </span>
+            </div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 mb-4">Pipeline Controller</h2>
             <form onSubmit={triggerPipeline} className="space-y-4">
               <div>

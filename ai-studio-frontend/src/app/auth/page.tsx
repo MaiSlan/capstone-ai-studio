@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -19,27 +20,23 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       if (isSignUp) {
         // Handle Sign Up
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        // Supabase sends a confirmation email by default. 
-        // For testing, you might want to turn off "Confirm Email" in Supabase Auth Settings.
-        alert('Check your email for the confirmation link! (Or login directly if email confirmation is disabled in Supabase)');
-      } else {
-        // Handle Sign In
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         
-        // Push user to the protected workspace
+        // FIX: Switch to Sign In mode automatically and show a success message
+        setIsSignUp(false);
+        setPassword(''); // Clear the password for security
+        setSuccess('Account initialized successfully. Please authenticate to enter the workspace.');
+      } else {
+        // Handle Sign In
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        
         router.push('/studio');
         router.refresh();
       }
@@ -69,11 +66,9 @@ export default function AuthPage() {
           {isSignUp ? 'Get 10 free generation tokens upon signup.' : 'Sign in to access your workspace and tokens.'}
         </p>
 
-        {error && (
-          <div className="bg-red-950/30 border border-red-900/50 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">
-            {error}
-          </div>
-        )}
+        {/* Dynamic Feedback Banners */}
+        {error && <div className="bg-red-950/30 border border-red-900/50 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">{error}</div>}
+        {success && <div className="bg-green-950/30 border border-green-900/50 text-green-400 text-sm p-3 rounded-lg mb-4 text-center">{success}</div>}
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div>
@@ -111,7 +106,7 @@ export default function AuthPage() {
         <div className="mt-6 text-center text-sm text-zinc-500">
           {isSignUp ? 'Already have access? ' : 'Need an authorization key? '}
           <button 
-            onClick={() => { setIsSignUp(!isSignUp); setError(null); }} 
+            onClick={() => { setIsSignUp(!isSignUp); setError(null); setSuccess(null); }} 
             className="text-green-500 hover:text-green-400 font-medium transition-colors"
           >
             {isSignUp ? 'Sign In' : 'Sign Up'}
