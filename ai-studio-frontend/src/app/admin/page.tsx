@@ -60,41 +60,38 @@ export default function AdminDashboard() {
       const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth);
       setMonthlyCompute(count || 0);
 
-      // 3. Fetch Global Ledger (Latest 100 generations with emails)
+      // 3. Fetch Global Ledger
       const { data: ledgerData } = await supabase.from('generations')
         .select('id, theme, lore, optimized_prompt, created_at, profiles(email)')
         .order('created_at', { ascending: false })
         .limit(100);
       if (ledgerData) setGenerations(ledgerData as any);
 
-      // 4. Fetch FinOps Telemetry (Modal Billing)
-      try {
-        const res = await fetch('https://capstone-ai-studio.onrender.com/api/v1/admin/billing', {
-          headers: { 'Authorization': `Bearer ${user.id}` } // We will grab the session properly below
-        });
-        
-        // Let's safely fetch using the actual JWT session token
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+      // INSTANTLY SHOW THE UI
+      setLoading(false);
+
+      // 4. Fetch FinOps Telemetry (IN THE BACKGROUND)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          // This happens silently while the admin is already looking at the dashboard
           const billingRes = await fetch('https://capstone-ai-studio.onrender.com/api/v1/admin/billing', {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
           });
           
           if (billingRes.ok) {
             const parsedData = await billingRes.json();
-            // Modal's JSON returns an array of usage objects. We sum up any 'cost' fields.
             let totalSpend = 0;
-            if (Array.isArray(parsedData.data)) {
+            // Ensure data exists before reducing
+            if (parsedData.data && Array.isArray(parsedData.data)) {
               totalSpend = parsedData.data.reduce((sum: number, item: any) => sum + (parseFloat(item.cost || item.total_cost || item.amount || 0)), 0);
             }
             setFinancialSpend(totalSpend);
           }
+        } catch (e) {
+          console.error("FinOps Telemetry failed to load:", e);
         }
-      } catch (e) {
-        console.error("FinOps Telemetry failed to load:", e);
       }
-
-      setLoading(false);
     };
 
     verifyAdminAndFetchData();
