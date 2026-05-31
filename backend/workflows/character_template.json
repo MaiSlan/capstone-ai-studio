@@ -58,7 +58,7 @@
   },
   "16": {
     "inputs": {
-      "lora_name": "chibistylexl.safetensors",
+      "lora_name": "chibistylexl-v1-2.safetensors",
       "strength_model": 1.15,
       "strength_clip": 1.15,
       "model": [ "8", 0 ],
