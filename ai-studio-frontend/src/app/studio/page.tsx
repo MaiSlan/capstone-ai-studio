@@ -366,29 +366,65 @@ export default function StudioDashboard() {
 
               {/* PHASE 4: RESULT ACTIONS */}
               {phase === 4 && (
-                <div className="space-y-6 h-full flex flex-col justify-center text-center px-4">
+                <div className="space-y-6 h-full flex flex-col">
                   {characterData?.images && characterData.images.length > 0 ? (
-                    <>
-                      <div className="mx-auto h-16 w-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 mb-2">
-                        <CheckCircle2 size={32} />
+                    <div className="flex-1 flex flex-col space-y-6 overflow-hidden">
+                      {/* Success Header */}
+                      <div className="flex items-center gap-4 bg-green-950/20 border border-green-900/50 rounded-lg p-4 shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 shrink-0">
+                          <CheckCircle2 size={20} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="text-sm font-bold text-green-500">Asset Rendered Successfully</h3>
+                          <p className="text-xs text-zinc-400 mt-0.5">Execution complete. Saved to local history.</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-zinc-100">Asset Rendered</h3>
-                        <p className="text-sm text-zinc-400 mt-2">Pipeline execution complete. The asset has been saved to your local workspace history.</p>
+
+                      {/* Read-Only Final Specs */}
+                      <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2 pb-2">
+                        {/* Initial Concept */}
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Initial Concept</span>
+                          <div className="text-sm text-zinc-200 font-medium bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
+                            {theme}
+                          </div>
+                        </div>
+
+                        {/* System Lore */}
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block flex items-center gap-1.5">
+                            <BookOpen size={12}/> System Lore
+                          </span>
+                          <div className="text-xs text-zinc-400 leading-relaxed bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
+                            {lore}
+                          </div>
+                        </div>
+
+                        {/* Cloud Tags */}
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block flex items-center gap-1.5">
+                            <Terminal size={12}/> Cloud Tags
+                          </span>
+                          <div className="text-xs text-zinc-500 font-mono leading-relaxed break-words bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
+                            {optimizedPrompt}
+                          </div>
+                        </div>
                       </div>
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      <div className="mx-auto h-16 w-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-2">
+                    <div className="h-full flex flex-col justify-center text-center">
+                      <div className="mx-auto h-16 w-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-4">
                         <AlertCircle size={32} />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-zinc-100">Render Failed</h3>
                         <p className="text-sm text-zinc-400 mt-2">The GPU encountered a critical error. Your token was not deducted.</p>
                       </div>
-                    </>
+                    </div>
                   )}
-                  <div className="pt-4">
+
+                  {/* Restart Button */}
+                  <div className="pt-2 mt-auto shrink-0 border-t border-zinc-800/50 pt-4">
                     <button onClick={startOver} className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
                       <RefreshCcw size={16} /> Draft New Concept
                     </button>
