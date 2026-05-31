@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, BookOpen, Layers, Terminal, Cpu, CheckCircle2, AlertCircle, Download, History, Trash2 } from 'lucide-react';
+import { Sparkles, BookOpen, Terminal, Cpu, CheckCircle2, AlertCircle, Download, History, Trash2, Coins } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 interface CharacterData {
   id?: string;
@@ -21,13 +22,34 @@ export default function StudioDashboard() {
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
   const [history, setHistory] = useState<CharacterData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Auth & Economy State
+  const supabase = createClient();
+  const [user, setUser] = useState<any>(null);
+  const [tokens, setTokens] = useState<number | null>(null);
+
+  // GPU Lifecycle State
   const [gpuStatus, setGpuStatus] = useState<'Standby' | 'Waking' | 'Active'>('Standby');
   const gpuTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    const savedHistory = localStorage.getItem('aiStudioHistory');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    
+    // Initialize User, Tokens, and History
+    const initWorkspace = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        // Fetch current token balance
+        const { data } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
+        if (data) setTokens(data.tokens);
+      }
+
+      const savedHistory = localStorage.getItem('aiStudioHistory');
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+    };
+    
+    initWorkspace();
   }, []);
 
   const downloadImage = (base64String: string, filename: string) => {
@@ -53,25 +75,41 @@ export default function StudioDashboard() {
     setCharacterData(null);
     setPipelineStep(0);
     
-    // Manage Modal GPU Status UI
+    // 1. Grab the user's active session token (The VIP Pass)
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwtToken = session?.access_token;
+
+    if (!jwtToken) {
+      setError("Authentication required. Please sign in.");
+      setLoading(false);
+      return;
+    }
+    
     if (gpuTimerRef.current) clearTimeout(gpuTimerRef.current);
     if (gpuStatus === 'Standby') {
       setGpuStatus('Waking');
-      setTimeout(() => setGpuStatus('Active'), 15000);
+      setTimeout(() => setGpuStatus('Active'), 15000); 
     }
 
-    setTimeout(() => setPipelineStep(1), 500);
-    setTimeout(() => setPipelineStep(2), 3500);
-    setTimeout(() => setPipelineStep(3), 6000);
+    setTimeout(() => setPipelineStep(1), 500);  
+    setTimeout(() => setPipelineStep(2), 3500); 
+    setTimeout(() => setPipelineStep(3), 6000); 
     
     try {
-      const response = await fetch('https://capstone-ai-studio.onrender.com/api/v1/generate-character', {
+      const response = await fetch('https://ai-studio-engine.onrender.com/api/v1/generate-character', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwtToken}` // <--- Injecting the token securely!
+        },
         body: JSON.stringify({ theme }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate assets from cloud pipeline.');
+      // Catch backend security rejections (401 Unauthorized, 402 Insufficient Tokens)
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate assets from cloud pipeline.');
+      }
 
       const data = await response.json();
       const newEntry: CharacterData = {
@@ -88,6 +126,12 @@ export default function StudioDashboard() {
       
       setPipelineStep(4);
       
+      // 2. Fetch the true token balance directly from the server (NO MORE CLIENT DEDUCTION)
+      if (user) {
+        const { data: profileData } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
+        if (profileData) setTokens(profileData.tokens);
+      }
+
       setGpuStatus('Active');
       gpuTimerRef.current = setTimeout(() => {
         setGpuStatus('Standby');
@@ -105,7 +149,7 @@ export default function StudioDashboard() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans antialiased">
+    <div className="min-h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 font-sans antialiased">
       <main className="max-w-[1600px] mx-auto p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
         
         {/* COLUMN 1: History Sidebar */}
@@ -140,7 +184,7 @@ export default function StudioDashboard() {
                     <span className="text-[10px] text-zinc-500">{item.timestamp}</span>
                   </div>
                   <div className="flex gap-2 h-12">
-                    {item.images.slice(0,2).map((img, idx) => (
+                    {item.images.slice(0,1).map((img, idx) => (
                       <div key={idx} className="h-full aspect-square bg-zinc-950 rounded border border-zinc-800 overflow-hidden">
                          <img src={`data:image/png;base64,${img}`} className="w-full h-full object-cover opacity-80" alt="thumbnail" />
                       </div>
@@ -155,19 +199,34 @@ export default function StudioDashboard() {
         {/* COLUMN 2: Pipeline Controls */}
         <section className="xl:col-span-3 space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl">
-            {/* NEW: GPU Status moved to the controller header */}
+            
+            {/* Header: Token & GPU Status */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Pipeline Controller</h2>
-              <span className="flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border border-zinc-800">
-                <Cpu size={12} className={
-                  gpuStatus === 'Active' ? 'text-green-500' :
-                  gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' :
-                  'text-zinc-600'
-                } />
-                {gpuStatus}
-              </span>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Controller</h2>
+              <div className="flex items-center gap-2">
+                
+                {/* Token Badge */}
+                {tokens !== null && (
+                  <span className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border ${
+                    tokens > 0 ? 'bg-zinc-950 border-green-900/50 text-green-500' : 'bg-red-950/30 border-red-900/50 text-red-500'
+                  }`}>
+                    <Coins size={12} />
+                    {tokens} Left
+                  </span>
+                )}
+
+                {/* GPU Badge */}
+                <span className="flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border border-zinc-800">
+                  <Cpu size={12} className={
+                    gpuStatus === 'Active' ? 'text-green-500' :
+                    gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' :
+                    'text-zinc-600'
+                  } />
+                  {gpuStatus}
+                </span>
+              </div>
             </div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 mb-4">Pipeline Controller</h2>
+
             <form onSubmit={triggerPipeline} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide">Concept Theme</label>
@@ -176,28 +235,27 @@ export default function StudioDashboard() {
                   value={theme}
                   onChange={(e) => setTheme(e.target.value)}
                   placeholder="e.g., neon samurai fox girl"
-                  disabled={loading}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-zinc-600 transition-colors disabled:opacity-50 text-zinc-100 placeholder:text-zinc-700"
+                  disabled={loading || (tokens !== null && tokens <= 0)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-green-500 transition-colors disabled:opacity-50 text-zinc-100 placeholder:text-zinc-700"
                 />
               </div>
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                disabled={loading || (tokens !== null && tokens <= 0)}
+                className="w-full bg-green-500 hover:bg-green-600 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:bg-green-500"
               >
                 <Sparkles size={16} />
-                {loading ? 'Processing Pipeline...' : 'Initialize Engine'}
+                {loading ? 'Processing Pipeline...' : 'Initialize Engine (1 Token)'}
               </button>
             </form>
           </div>
 
-          {/* Visual Progress Steps */}
           {(pipelineStep > 0 || loading) && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Orchestration Steps</h3>
               <div className="space-y-3">
                 <PipelineStep icon={<BookOpen size={16} />} label="Local Lore Generation" isActive={pipelineStep === 1} isDone={pipelineStep > 1} />
-                <PipelineStep icon={<Layers size={16} />} label="Cloud Tag Optimization" isActive={pipelineStep === 2} isDone={pipelineStep > 2} />
+                <PipelineStep icon={<Terminal size={16} />} label="Cloud Tag Optimization" isActive={pipelineStep === 2} isDone={pipelineStep > 2} />
                 <PipelineStep icon={<Cpu size={16} />} label="Modal Cloud GPU Rendering" isActive={pipelineStep === 3} isDone={pipelineStep > 3} />
               </div>
             </div>
@@ -215,8 +273,6 @@ export default function StudioDashboard() {
         <section className="xl:col-span-6">
           {characterData ? (
             <div className="space-y-6 animate-fade-in">
-              
-              {/* Single HD Asset Presentation */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4 group shadow-lg">
                 <div className="flex justify-between items-center text-xs uppercase tracking-wider text-zinc-400 font-medium px-1">
                   <span className="text-green-500 font-bold">Raw HD Render</span>
@@ -233,7 +289,6 @@ export default function StudioDashboard() {
                 </div>
               </div>
 
-              {/* Backstory & Metadata */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-6 shadow-lg">
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1.5">
@@ -260,7 +315,7 @@ export default function StudioDashboard() {
                 <Terminal size={20} />
               </div>
               <h3 className="text-sm font-medium text-zinc-300 mb-1">Workspace Ready</h3>
-              <p className="text-xs text-zinc-500 max-w-xs">Enter a theme to generate an asset, or select a previous run from the history sidebar.</p>
+              <p className="text-xs text-zinc-500 max-w-xs">Enter a theme to generate an asset. 1 Token will be deducted upon generation.</p>
             </div>
           )}
         </section>

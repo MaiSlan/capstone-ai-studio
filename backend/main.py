@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
@@ -8,24 +8,41 @@ import requests
 from dotenv import load_dotenv
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
+from supabase import create_client, Client
 
 load_dotenv()
 
-# ==========================================
-# 1. INIT THE SERVER (THIS MUST BE FIRST!)
-# ==========================================
 app = FastAPI(title="AI Studio Hybrid Engine")
 
-# ==========================================
-# 2. THE CORS FIX (THIS MUST BE SECOND!)
-# ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows Vercel to connect
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================================
+# GATEKEEPER
+# ==========================================
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+def verify_token(authorization: str = Header(None)):
+    """Extracts the JWT from the frontend, verifies it, and returns the user ID."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized: Missing authentication token.")
+    
+    token = authorization.split(" ")[1]
+    try:
+        # Supabase cryptographically verifies the token
+        user_response = supabase.auth.get_user(token)
+        if not user_response.user:
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid token.")
+        return user_response.user
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 # ==========================================
 # 3. THE CLOUD ENGINE
@@ -112,14 +129,24 @@ workflow.add_edge("artist", END)
 studio_app = workflow.compile()
 
 # ==========================================
-# 6. THE MASTER ENDPOINT
+# ENDPOINT
 # ==========================================
 @app.post("/api/v1/generate-character")
-async def generate_character(req: ConceptRequest):
-    print(f"🎬 Starting Studio Pipeline for: {req.theme}")
+async def generate_character(req: ConceptRequest, user = Depends(verify_token)):
+    print(f"🎬 Authenticated Request from User: {user.id} | Theme: {req.theme}")
     
+    # 1. SERVER-SIDE BALANCE CHECK
+    profile_res = supabase.table("profiles").select("tokens").eq("id", user.id).execute()
+    if not profile_res.data or profile_res.data[0]["tokens"] <= 0:
+        raise HTTPException(status_code=402, detail="Payment Required: Insufficient tokens.")
+    
+    # 2. RUN THE CLOUD PIPELINE
     initial_state = {"theme": req.theme, "lore": "", "image_prompt": "", "images": []}
     result = studio_app.invoke(initial_state)
+    
+    # 3. SECURE ATOMIC DECREMENT
+    # This calls the SQL function we created to safely deduct 1 token
+    supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
     
     return {
         "status": "pipeline_complete",
