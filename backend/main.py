@@ -107,7 +107,7 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
         
     comfy_workflow["9"]["inputs"]["text"] = final_prompt 
     
-    modal_payload = {"workflow": comfy_workflow}
+    modal_payload = {"prompt": comfy_workflow}
     modal_url = os.getenv("MODAL_WEBHOOK_URL")
     
     # 3. FIRE THE GPU

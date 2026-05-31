@@ -12,14 +12,21 @@ export default function Navbar() {
   const supabase = createClient();
   
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('user');
   const [isArchOpen, setIsArchOpen] = useState(false); // Tracks dropdown state
   const dropdownRef = useRef<HTMLDivElement>(null); // Used to detect outside clicks
 
   // Check for active user session on mount
   useEffect(() => {
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+      const { data: authData } = await supabase.auth.getUser();
+      setUser(authData.user);
+      
+      if (authData.user) {
+        // Fetch the role
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).single();
+        if (profile) setUserRole(profile.role);
+      }
     };
     getUser();
 
@@ -91,6 +98,15 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {/* Admin Link (Only visible to admins) */}
+          {userRole === 'admin' && (
+            <Link href="/admin" className="text-zinc-400 hover:text-green-400 font-medium transition-colors flex items-center gap-1.5">
+              <Shield size={14} /> Admin
+            </Link>
+          )}
+
+          <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
 
           <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
           

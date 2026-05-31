@@ -363,13 +363,27 @@ export default function StudioDashboard() {
               {/* PHASE 4: RESULT ACTIONS */}
               {phase === 4 && (
                 <div className="space-y-6 h-full flex flex-col justify-center text-center px-4">
-                  <div className="mx-auto h-16 w-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 mb-2">
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-zinc-100">Asset Rendered</h3>
-                    <p className="text-sm text-zinc-400 mt-2">Pipeline execution complete. The asset has been saved to your local workspace history.</p>
-                  </div>
+                  {characterData?.images && characterData.images.length > 0 ? (
+                    <>
+                      <div className="mx-auto h-16 w-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 mb-2">
+                        <CheckCircle2 size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-zinc-100">Asset Rendered</h3>
+                        <p className="text-sm text-zinc-400 mt-2">Pipeline execution complete. The asset has been saved to your local workspace history.</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mx-auto h-16 w-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-2">
+                        <AlertCircle size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-zinc-100">Render Failed</h3>
+                        <p className="text-sm text-zinc-400 mt-2">The GPU encountered a critical error. Your token was not deducted.</p>
+                      </div>
+                    </>
+                  )}
                   <div className="pt-4">
                     <button onClick={startOver} className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
                       <RefreshCcw size={16} /> Draft New Concept
