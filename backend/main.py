@@ -121,7 +121,7 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
         
     comfy_workflow["9"]["inputs"]["text"] = final_prompt 
     
-    modal_payload = {"prompt": comfy_workflow}
+    modal_payload = comfy_workflow 
     modal_url = os.getenv("MODAL_WEBHOOK_URL")
     
     # 3. FIRE THE GPU
@@ -133,10 +133,24 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Modal Engine Error: {str(e)}")
 
-    # 4. SECURE ATOMIC DECREMENT
+    # Ensure modal_data is actually a dictionary before accessing
+    if not isinstance(modal_data, dict):
+        raise HTTPException(status_code=500, detail="Invalid response format from GPU.")
+        
+    raw_images = modal_data.get("images", [])
+    
+    # Aggressively filter out nulls, empty strings, and errors. 
+    # A true base64 image string is massive, so we check if it is > 100 characters.
+    valid_images = [img for img in raw_images if isinstance(img, str) and len(img) > 100]
+
+    if not valid_images:
+        error_msg = modal_data.get("error", "ComfyUI failed to generate a tensor output.")
+        raise HTTPException(status_code=500, detail=f"GPU Pipeline Failed: {error_msg}")
+
+    # 4. SECURE ATOMIC DECREMENT (Only runs if a valid image actually exists!)
     supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
     
-    return {"images": modal_data.get("images", [])}
+    return {"images": valid_images}
 
 # ==========================================
 # 5. ADMIN UTILITIES
