@@ -13,29 +13,36 @@ export default function Navbar() {
   
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('user');
-  const [isArchOpen, setIsArchOpen] = useState(false); // Tracks dropdown state
-  const dropdownRef = useRef<HTMLDivElement>(null); // Used to detect outside clicks
+  const [isArchOpen, setIsArchOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Check for active user session on mount
   useEffect(() => {
+    // 1. Created a dedicated function to fetch the role
+    const fetchRole = async (userId: string) => {
+      const { data } = await supabase.from('profiles').select('role').eq('id', userId).single();
+      if (data) setUserRole(data.role);
+    };
+
     const getUser = async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-      
-      if (authData.user) {
-        // Fetch the role
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).single();
-        if (profile) setUserRole(profile.role);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        fetchRole(session.user.id); // Fetch role on mount
       }
     };
+    
     getUser();
 
-    // Listen for login/logout events automatically
+    // 2. Updated the listener to fetch the new role whenever accounts switch
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchRole(session.user.id);
+      } else {
+        setUserRole('user'); // Reset role to default if logged out
+      }
     });
 
-    // Event listener to close dropdown when clicking outside of it
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsArchOpen(false);
@@ -78,19 +85,18 @@ export default function Navbar() {
               <ChevronDown size={14} className={`transition-transform duration-200 ${isArchOpen ? 'rotate-180' : ''}`} />
             </button>
             
-            {/* Conditional Rendering of the Dropdown Menu */}
             {isArchOpen && (
               <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl flex flex-col overflow-hidden z-50">
                 <Link 
                   href="/architecture" 
-                  onClick={() => setIsArchOpen(false)} // Close menu on click
+                  onClick={() => setIsArchOpen(false)}
                   className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50 border-b border-zinc-800/50"
                 >
                   System Overview
                 </Link>
                 <Link 
                   href="/architecture/workflow" 
-                  onClick={() => setIsArchOpen(false)} // Close menu on click
+                  onClick={() => setIsArchOpen(false)}
                   className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50"
                 >
                   ComfyUI Tensor Graph
@@ -106,8 +112,7 @@ export default function Navbar() {
             </Link>
           )}
 
-          <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
-
+          {/* Fixed: Only one Workspace link now! */}
           <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
           
           <div className="h-4 w-px bg-zinc-800 mx-2"></div>
