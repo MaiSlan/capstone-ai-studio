@@ -95,20 +95,24 @@ async def draft_lore(req: DraftRequest):
         
     return {"lore": response.content}
 
-
 @app.post("/api/v1/optimize-tags")
 async def optimize_tags(req: OptimizeRequest):
     """Phase 2: Converts the finalized lore into Danbooru tags. (FREE)"""
-    prompt = f"""Convert this backstory into a comma-separated Danbooru tag list for an anime model.
+    prompt = f"""Convert this backstory into a comma-separated Danbooru tag list for an SDXL anime model.
+    
     CRITICAL INSTRUCTIONS:
-    1. DEDUCE THE SUBJECT: Include EXACTLY ONE of these tags: '1girl', '1boy', or 'mecha'.
-    2. MANDATORY TAGS: Always include 'solo, single character, white background, simple background'.
-    3. STRICTLY EXCLUDE BACKGROUNDS: Do NOT include any tags about environments, cities, or weather.
-    4. OUTPUT FORMAT: Return ONLY the comma-separated tags. NO introductory text.
+    1. DEDUCE THE SUBJECT: Include EXACTLY ONE of these tags: '1girl', '1boy'.
+    2. THE ANATOMY BASE: You MUST start the prompt with exactly these tags:
+       '1girl' OR '1boy', solo, simple background, white background, chibi, cute, full body, standing straight, side faced, round face, oversized face, big round eyes,
+    3. CHARACTER SPECIFICS: After the base tags, add 5 to 10 highly specific tags describing the character's clothing, expression based on the backstory.
+    4. NO REDUNDANCY: Do not repeat similar concepts.
+    5. NO BACKGROUNDS: Strictly exclude tags about environments, cities, weather, or lighting.
+    6. OUTPUT FORMAT: Return ONLY the comma-separated tags. NO introductory text.
 
     Backstory: {req.lore}"""
     
     response = llm.invoke(prompt)
+    
     # GROQ TELEMETRY LOGGING
     usage = response.response_metadata.get("token_usage", {})
     total_tokens = usage.get("total_tokens", 0)
@@ -116,7 +120,6 @@ async def optimize_tags(req: OptimizeRequest):
         supabase.table("groq_telemetry").insert({"endpoint": "optimize-tags", "total_tokens": total_tokens}).execute()
         
     return {"optimized_prompt": response.content}
-
 
 @app.post("/api/v1/render-image")
 async def render_image(req: RenderRequest, user = Depends(verify_token)):
@@ -128,7 +131,7 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
         raise HTTPException(status_code=402, detail="Payment Required: Insufficient tokens.")
     
     # 2. INJECT PAYLOAD INTO JSON WORKFLOW
-    final_prompt = "score_9, masterpiece, chibi, super deformed, full body, standing, flat colors, white background, " + req.optimized_prompt
+    final_prompt = "score_9, score_8_up, score_7_up, masterpiece, chibi, super deformed, full body, standing, side faced, flat colors, white background, " + req.optimized_prompt
     
     with open("workflows/character_template.json", "r") as f:
         comfy_workflow = json.load(f)
