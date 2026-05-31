@@ -171,7 +171,7 @@ export default function StudioDashboard() {
       }
 
       const queueData = await res.json();
-      const jobId = queueData.generation_id; // Get the database tracker ID
+      const jobId = queueData.generation_id;
 
       // 2. Start Polling the background task every 3 seconds
       const pollInterval = setInterval(async () => {
@@ -185,39 +185,35 @@ export default function StudioDashboard() {
 
           // SCENARIO A: The GPU finished successfully!
           if (job.status === 'completed') {
-            clearInterval(pollInterval); // Stop asking the server
+            clearInterval(pollInterval);
             
-            // Build the character data using the new database response
             const newEntry: CharacterData = {
-              id: jobId, // Using the true database UUID
+              id: jobId, 
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               theme,
               lore,
               optimized_prompt: optimizedPrompt,
-              images: [job.image_data] // Wrap the single base64 string in an array for compatibility
+              images: [job.image_base64]
             };
             
             setCharacterData(newEntry);
             
-            // Update Workspace History
             const updatedHistory = [newEntry, ...history].slice(0, 15);
             setHistory(updatedHistory);
             localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
             
             setPhase(4);
             
-            // Update Token Balance Live
             if (user) {
               const { data: profileData } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
               if (profileData) setTokens(profileData.tokens);
             }
 
-            // Manage GPU Status
             setGpuStatus('Active');
             gpuTimerRef.current = setTimeout(() => { setGpuStatus('Standby'); }, 5 * 60 * 1000);
             
-            setLoading(false); // Finally turn off the loading UI
-          } 
+            setLoading(false);
+          }
           
           // SCENARIO B: The GPU crashed (e.g. CUDA Out of Memory)
           else if (job.status === 'failed') {

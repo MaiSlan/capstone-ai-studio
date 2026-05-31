@@ -148,7 +148,7 @@ def orchestrate_gpu_background(generation_id: str, user_id: str, req_optimized_p
             # Task Succeeded: Save the image data and flip status to completed
             supabase.table("generations").update({
                 "status": "completed",
-                "image_data": valid_images[0] # Save the primary base64 image string
+                "image_base64": valid_images[0]
             }).eq("id", generation_id).execute()
             
             # Securely charge the token only on a true absolute success
@@ -200,7 +200,7 @@ async def render_image(req: RenderRequest, background_tasks: BackgroundTasks, us
 @app.get("/api/v1/render-status/{generation_id}")
 async def check_render_status(generation_id: str, user = Depends(verify_token)):
     """Allows the frontend to loop-check on background worker status securely."""
-    res = supabase.table("generations").select("status", "image_data").eq("id", generation_id).single().execute()
+    res = supabase.table("generations").select("status", "image_base64").eq("id", generation_id).single().execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Job footprint not found.")
     return res.data
