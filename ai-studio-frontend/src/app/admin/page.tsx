@@ -31,6 +31,7 @@ export default function AdminDashboard() {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [monthlyCompute, setMonthlyCompute] = useState<number>(0);
   const [financialSpend, setFinancialSpend] = useState<number>(0);
+  const [dailyGroqTokens, setDailyGroqTokens] = useState<number>(0);
   
   // UI States
   const [activeTab, setActiveTab] = useState<'directory' | 'ledger'>('directory');
@@ -66,6 +67,17 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false })
         .limit(100);
       if (ledgerData) setGenerations(ledgerData as any);
+
+      // 3.5 Fetch Groq Daily Telemetry
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const { data: groqData } = await supabase
+        .from('groq_telemetry')
+        .select('total_tokens')
+        .gte('created_at', startOfDay.toISOString());
+      
+      const tokensBurned = groqData?.reduce((sum, row) => sum + row.total_tokens, 0) || 0;
+      setDailyGroqTokens(tokensBurned);
 
       setLoading(false);
 
@@ -150,7 +162,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* GLOBAL TELEMETRY STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-3 text-zinc-400 mb-2 font-medium text-sm uppercase tracking-wider">
             <Users size={16} /> Total Operators
@@ -163,6 +175,24 @@ export default function AdminDashboard() {
             <Coins size={16} /> Active Economy
           </div>
           <div className="text-4xl font-bold text-zinc-50 tracking-tight">{totalTokens} <span className="text-sm font-normal text-zinc-500 tracking-normal">Tokens</span></div>
+        </div>
+
+        {/* NEW: Groq LLM Token Monitor */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div className="flex items-center justify-between text-zinc-400 mb-4 font-medium text-sm uppercase tracking-wider relative z-10">
+            <span className="flex items-center gap-3"><Terminal size={16} /> Groq API (Today)</span>
+          </div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-zinc-50 tracking-tight mb-3">
+              {dailyGroqTokens.toLocaleString()} <span className="text-xs font-normal text-zinc-500 tracking-normal">/ 100K Limit</span>
+            </div>
+            <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
+              <div 
+                className={`h-full transition-all duration-1000 ${dailyGroqTokens > 90000 ? 'bg-red-500' : dailyGroqTokens > 75000 ? 'bg-amber-500' : 'bg-green-500'}`}
+                style={{ width: `${Math.min((dailyGroqTokens / 100000) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* FINOPS: The Modal System Cost Monitor */}

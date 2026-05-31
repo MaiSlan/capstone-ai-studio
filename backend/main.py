@@ -71,6 +71,8 @@ class OptimizeRequest(BaseModel):
     lore: str
 
 class RenderRequest(BaseModel):
+    theme: str
+    lore: str
     optimized_prompt: str
 
 # ==========================================
@@ -85,6 +87,12 @@ async def draft_lore(req: DraftRequest):
     Keep it concise, highly detailed, and evocative. Do NOT add conversational filler."""
     
     response = llm.invoke(prompt)
+    # GROQ TELEMETRY LOGGING
+    usage = response.response_metadata.get("token_usage", {})
+    total_tokens = usage.get("total_tokens", 0)
+    if total_tokens > 0:
+        supabase.table("groq_telemetry").insert({"endpoint": "draft-lore", "total_tokens": total_tokens}).execute()
+        
     return {"lore": response.content}
 
 
@@ -101,6 +109,12 @@ async def optimize_tags(req: OptimizeRequest):
     Backstory: {req.lore}"""
     
     response = llm.invoke(prompt)
+    # GROQ TELEMETRY LOGGING
+    usage = response.response_metadata.get("token_usage", {})
+    total_tokens = usage.get("total_tokens", 0)
+    if total_tokens > 0:
+        supabase.table("groq_telemetry").insert({"endpoint": "optimize-tags", "total_tokens": total_tokens}).execute()
+        
     return {"optimized_prompt": response.content}
 
 
@@ -146,6 +160,18 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
     if not valid_images:
         error_msg = modal_data.get("error", "ComfyUI failed to generate a tensor output.")
         raise HTTPException(status_code=500, detail=f"GPU Pipeline Failed: {error_msg}")
+
+    supabase.table("generations").insert({
+        "user_id": user.id,
+        "theme": req.theme,
+        "lore": req.lore,
+        "optimized_prompt": req.optimized_prompt
+    }).execute()
+
+    # 4. SECURE ATOMIC DECREMENT 
+    supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
+    
+    return {"images": valid_images}
 
     # 4. SECURE ATOMIC DECREMENT (Only runs if a valid image actually exists!)
     supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()

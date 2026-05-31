@@ -158,7 +158,11 @@ export default function StudioDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${jwtToken}`
         },
-        body: JSON.stringify({ optimized_prompt: optimizedPrompt }),
+        body: JSON.stringify({ 
+          theme: theme, 
+          lore: lore, 
+          optimized_prompt: optimizedPrompt 
+        }),
       });
 
       if (!res.ok) {
