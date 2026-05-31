@@ -80,15 +80,21 @@ export default function AdminDashboard() {
           if (billingRes.ok) {
             const parsedData = await billingRes.json();
             
-            console.log("💰 RAW MODAL FINOPS DATA:", parsedData.data);
-            
             let totalSpend = 0;
             if (parsedData.data && Array.isArray(parsedData.data)) {
-              totalSpend = parsedData.data.reduce((sum: number, item: any) => {
-                const itemCost = item.cost || item.total_cost || item.amount || item.usage || item.spend || item.total || 0;
+              
+              // 1. ISOLATE THE ENVIRONMENT: Keep only AI_Studio costs
+              const aiStudioUsage = parsedData.data.filter(
+                (item: any) => item.Environment === 'AI_Studio'
+              );
+
+              // 2. PARSE THE TARGET: Target the capitalized "Cost" string
+              totalSpend = aiStudioUsage.reduce((sum: number, item: any) => {
+                const itemCost = item.Cost || item.cost || 0;
                 return sum + parseFloat(itemCost);
               }, 0);
             }
+            
             setFinancialSpend(totalSpend);
           }
         } catch (e) {
