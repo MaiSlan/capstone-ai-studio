@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Users, Coins, Search, Edit2, Check, X } from 'lucide-react';
+import { Shield, Users, Coins, Search, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 interface Profile {
@@ -19,6 +19,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTokenValue, setEditTokenValue] = useState<number>(0);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
   const supabase = createClient();
   const router = useRouter();
@@ -67,6 +68,32 @@ export default function AdminDashboard() {
       Authenticating clearance...
     </div>
   );
+
+  const handleDeleteUser = async (userId: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwtToken = session?.access_token;
+    
+    if (!jwtToken) return;
+
+    try {
+      const res = await fetch(`https://capstone-ai-studio.onrender.com/api/v1/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${jwtToken}` }
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail);
+      }
+      
+      // Instantly remove the user from the React UI
+      setProfiles(profiles.filter(p => p.id !== userId));
+      setUserToDelete(null);
+    } catch (error: any) {
+      alert(`Deletion Failed: ${error.message}`);
+      setUserToDelete(null);
+    }
+  };
 
   const totalTokensInEconomy = profiles.reduce((sum, p) => sum + p.tokens, 0);
 
@@ -156,14 +183,33 @@ export default function AdminDashboard() {
                           <X size={16} />
                         </button>
                       </div>
+                    ) : userToDelete === profile.id ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleDeleteUser(profile.id)} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30 transition-colors text-xs font-bold px-2 tracking-wider">
+                          CONFIRM
+                        </button>
+                        <button onClick={() => setUserToDelete(null)} className="p-1.5 bg-zinc-800 text-zinc-400 rounded hover:bg-zinc-700 transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
                     ) : (
-                      <button 
-                        onClick={() => { setEditingId(profile.id); setEditTokenValue(profile.tokens); }}
-                        className="p-1.5 text-zinc-500 hover:text-green-400 transition-colors"
-                        title="Edit Tokens"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button 
+                          onClick={() => { setEditingId(profile.id); setEditTokenValue(profile.tokens); }}
+                          className="p-1.5 text-zinc-500 hover:text-green-400 transition-colors"
+                          title="Edit Tokens"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setUserToDelete(profile.id)}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+                          title="Terminate Operator"
+                          disabled={profile.role === 'admin'} // Protects other admins
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

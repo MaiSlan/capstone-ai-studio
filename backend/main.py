@@ -38,6 +38,19 @@ def verify_token(authorization: str = Header(None)):
         return user_response.user
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+    
+# ==========================================
+# 1.5 ADMIN GATEKEEPER
+# ==========================================
+def verify_admin(authorization: str = Header(None)):
+    """Verifies the token AND checks if the user has the 'admin' role."""
+    user = verify_token(authorization)
+    
+    profile_res = supabase.table("profiles").select("role").eq("id", user.id).execute()
+    if not profile_res.data or profile_res.data[0]["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin clearance required.")
+    
+    return user
 
 # ==========================================
 # 2. AI ENGINE INITIALIZATION
@@ -123,3 +136,26 @@ async def render_image(req: RenderRequest, user = Depends(verify_token)):
     supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
     
     return {"images": modal_data.get("images", [])}
+
+# ==========================================
+# 5. ADMIN UTILITIES
+# ==========================================
+@app.delete("/api/v1/admin/users/{target_id}")
+async def delete_user(target_id: str, admin_user = Depends(verify_admin)):
+    """Wipes a user's generations, profile, and authentication identity."""
+    
+    # Prevent the admin from accidentally deleting themselves
+    if target_id == admin_user.id:
+        raise HTTPException(status_code=400, detail="Cannot terminate your own command account.")
+    
+    try:
+        # 1. Wipe the history (prevents database locking errors)
+        supabase.table("generations").delete().eq("user_id", target_id).execute()
+        # 2. Wipe the public profile
+        supabase.table("profiles").delete().eq("id", target_id).execute()
+        # 3. Destroy the root authentication identity using the Master Key
+        supabase.auth.admin.delete_user(target_id)
+        
+        return {"status": "success", "message": "Operator terminated."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Termination failed: {str(e)}")
