@@ -30,6 +30,7 @@ export default function AdminDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [monthlyCompute, setMonthlyCompute] = useState<number>(0);
+  const [financialSpend, setFinancialSpend] = useState<number>(0);
   
   // UI States
   const [activeTab, setActiveTab] = useState<'directory' | 'ledger'>('directory');
@@ -65,6 +66,33 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false })
         .limit(100);
       if (ledgerData) setGenerations(ledgerData as any);
+
+      // 4. Fetch FinOps Telemetry (Modal Billing)
+      try {
+        const res = await fetch('https://capstone-ai-studio.onrender.com/api/v1/admin/billing', {
+          headers: { 'Authorization': `Bearer ${user.id}` } // We will grab the session properly below
+        });
+        
+        // Let's safely fetch using the actual JWT session token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const billingRes = await fetch('https://capstone-ai-studio.onrender.com/api/v1/admin/billing', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          });
+          
+          if (billingRes.ok) {
+            const parsedData = await billingRes.json();
+            // Modal's JSON returns an array of usage objects. We sum up any 'cost' fields.
+            let totalSpend = 0;
+            if (Array.isArray(parsedData.data)) {
+              totalSpend = parsedData.data.reduce((sum: number, item: any) => sum + (parseFloat(item.cost || item.total_cost || item.amount || 0)), 0);
+            }
+            setFinancialSpend(totalSpend);
+          }
+        }
+      } catch (e) {
+        console.error("FinOps Telemetry failed to load:", e);
+      }
 
       setLoading(false);
     };
@@ -131,21 +159,31 @@ export default function AdminDashboard() {
           <div className="text-4xl font-bold text-zinc-50 tracking-tight">{totalTokens} <span className="text-sm font-normal text-zinc-500 tracking-normal">Tokens</span></div>
         </div>
 
-        {/* The Modal System Cost Monitor */}
+        {/* FINOPS: The Modal System Cost Monitor */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          
+          {/* Top Row: Server Actions */}
           <div className="flex items-center justify-between text-zinc-400 mb-4 font-medium text-sm uppercase tracking-wider relative z-10">
-            <span className="flex items-center gap-3"><Activity size={16} /> GPU Compute (This Month)</span>
-            <span className="text-xs font-bold">{computePercentage.toFixed(1)}%</span>
+            <span className="flex items-center gap-3"><Activity size={16} /> Cloud Compute</span>
+            <span className="text-xs font-bold">{monthlyCompute} / {MODAL_MONTHLY_LIMIT}</span>
+          </div>
+          <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 mb-6 relative z-10">
+            <div 
+              className={`h-full transition-all duration-1000 ${computePercentage > 90 ? 'bg-red-500' : computePercentage > 75 ? 'bg-amber-500' : 'bg-green-500'}`}
+              style={{ width: `${computePercentage}%` }}
+            />
+          </div>
+
+          {/* Bottom Row: Financial Spend */}
+          <div className="flex items-center justify-between text-zinc-400 mb-2 font-medium text-sm uppercase tracking-wider relative z-10">
+            <span className="flex items-center gap-3 text-green-500">Live API Spend</span>
+            <span className="text-xs font-bold">${financialSpend.toFixed(2)} / $30.00</span>
           </div>
           <div className="relative z-10">
-            <div className="text-4xl font-bold text-zinc-50 tracking-tight mb-3">
-              {monthlyCompute} <span className="text-sm font-normal text-zinc-500 tracking-normal">/ {MODAL_MONTHLY_LIMIT} Limit</span>
-            </div>
-            {/* Progress Bar */}
-            <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
+            <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-green-900/30">
               <div 
-                className={`h-full transition-all duration-1000 ${computePercentage > 90 ? 'bg-red-500' : computePercentage > 75 ? 'bg-amber-500' : 'bg-green-500'}`}
-                style={{ width: `${computePercentage}%` }}
+                className={`h-full bg-green-500 transition-all duration-1000`}
+                style={{ width: `${Math.min((financialSpend / 30) * 100, 100)}%` }}
               />
             </div>
           </div>

@@ -7,6 +7,7 @@ import json
 import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import subprocess
 
 load_dotenv()
 
@@ -159,3 +160,25 @@ async def delete_user(target_id: str, admin_user = Depends(verify_admin)):
         return {"status": "success", "message": "Operator terminated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Termination failed: {str(e)}")
+    
+@app.get("/api/v1/admin/billing")
+async def get_billing_telemetry(admin_user = Depends(verify_admin)):
+    """Fetches live cloud spend from Modal's FinOps API."""
+    try:
+        # We use subprocess to leverage Modal's built-in date math (--for "this month")
+        # Modal automatically authenticates using the MODAL_TOKEN_ID in the environment.
+        result = subprocess.run(
+            ["modal", "billing", "report", "--for", "this month", "--json"],
+            capture_output=True, text=True, check=True
+        )
+        
+        # Parse the CLI's JSON string into a Python dictionary/list
+        billing_data = json.loads(result.stdout)
+        
+        return {"status": "success", "data": billing_data}
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Modal CLI Error: {e.stderr}")
+        raise HTTPException(status_code=500, detail="Failed to fetch FinOps telemetry.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
