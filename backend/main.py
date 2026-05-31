@@ -1,3 +1,4 @@
+import uuid
 from fastapi import FastAPI, Depends, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -165,29 +166,35 @@ def orchestrate_gpu_background(generation_id: str, user_id: str, req_optimized_p
 async def render_image(req: RenderRequest, background_tasks: BackgroundTasks, user = Depends(verify_token)):
     """Phase 3: Instantly registers a background worker job to prevent gateway timeouts."""
     
-    # 1. Create a secure tracking slot in the global database ledger instantly
-    insert_res = supabase.table("generations").insert({
-        "user_id": user.id,
-        "theme": req.theme,
-        "lore": req.lore,
-        "optimized_prompt": req.optimized_prompt,
-        "status": "processing"
-    }).execute()
-    
-    if not insert_res.data:
-        raise HTTPException(status_code=500, detail="Failed to initialize system logging slot.")
+    # 1. SERVER-SIDE BALANCE CHECK (Restored!)
+    profile_res = supabase.table("profiles").select("tokens").eq("id", user.id).execute()
+    if not profile_res.data or profile_res.data[0]["tokens"] <= 0:
+        raise HTTPException(status_code=402, detail="Payment Required: Insufficient tokens.")
         
-    generation_id = insert_res.data[0]["id"]
+    # 2. Generate a secure tracking ID locally to completely prevent Supabase IndexErrors
+    generation_id = str(uuid.uuid4())
     
-    # 2. Delegate the 65-second GPU cold start to an isolated background thread
+    # 3. Create a secure tracking slot in the global database ledger instantly
+    try:
+        supabase.table("generations").insert({
+            "id": generation_id,
+            "user_id": user.id,
+            "theme": req.theme,
+            "lore": req.lore,
+            "optimized_prompt": req.optimized_prompt,
+            "status": "processing"
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database ledger failed: {str(e)}")
+    
+    # 4. Delegate the 65-second GPU cold start to an isolated background thread
     background_tasks.add_task(
         orchestrate_gpu_background, 
         generation_id, user.id, req.optimized_prompt, req.theme, req.lore
     )
     
-    # 3. Hand control back to Next.js in 100 milliseconds so the browser never experiences a timeout
+    # 5. Hand control back to Next.js in 100 milliseconds so the browser never experiences a timeout
     return {"status": "queued", "generation_id": generation_id}
-
 
 # 3. Add a lightning-fast status checker endpoint
 @app.get("/api/v1/render-status/{generation_id}")
