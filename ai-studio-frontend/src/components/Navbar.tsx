@@ -46,7 +46,20 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6 text-sm">
-          <Link href="/architecture" className="text-zinc-400 hover:text-zinc-50 transition-colors">Architecture</Link>
+          {/* Architecture Dropdown */}
+          <div className="relative group py-2">
+            <button className="text-zinc-400 hover:text-zinc-50 transition-colors flex items-center gap-1">
+              Architecture
+            </button>
+            <div className="absolute top-full left-0 mt-1 w-48 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col overflow-hidden z-50">
+              <Link href="/architecture" className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50 border-b border-zinc-800/50">
+                System Overview
+              </Link>
+              <Link href="/architecture/workflow" className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50">
+                ComfyUI Tensor Graph
+              </Link>
+            </div>
+          </div>
           <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
           
           <div className="h-4 w-px bg-zinc-800 mx-2"></div>
