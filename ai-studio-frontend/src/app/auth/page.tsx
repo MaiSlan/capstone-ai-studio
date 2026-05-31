@@ -25,12 +25,18 @@ export default function AuthPage() {
     try {
       if (isSignUp) {
         // Handle Sign Up
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            // This explicitly tells Supabase where to send the user after clicking the email link
+            emailRedirectTo: `${window.location.origin}/auth/callback` 
+          }
+        });
         if (error) throw error;
         
-        // FIX: Switch to Sign In mode automatically and show a success message
         setIsSignUp(false);
-        setPassword(''); // Clear the password for security
+        setPassword('');
         setSuccess('Account initialized successfully. Please authenticate to enter the workspace.');
       } else {
         // Handle Sign In
