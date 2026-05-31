@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Terminal, LogOut } from 'lucide-react';
+import { Terminal, LogOut, ChevronDown } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  
   const [user, setUser] = useState<any>(null);
+  const [isArchOpen, setIsArchOpen] = useState(false); // Tracks dropdown state
+  const dropdownRef = useRef<HTMLDivElement>(null); // Used to detect outside clicks
 
   // Check for active user session on mount
   useEffect(() => {
@@ -25,7 +28,18 @@ export default function Navbar() {
       setUser(session?.user ?? null);
     });
 
-    return () => authListener.subscription.unsubscribe();
+    // Event listener to close dropdown when clicking outside of it
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsArchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -46,20 +60,38 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6 text-sm">
-          {/* Architecture Dropdown */}
-          <div className="relative group py-2">
-            <button className="text-zinc-400 hover:text-zinc-50 transition-colors flex items-center gap-1">
+          
+          {/* Architecture Click Dropdown */}
+          <div className="relative py-2" ref={dropdownRef}>
+            <button 
+              onClick={() => setIsArchOpen(!isArchOpen)}
+              className={`flex items-center gap-1.5 transition-colors focus:outline-none ${isArchOpen ? 'text-zinc-50' : 'text-zinc-400 hover:text-zinc-50'}`}
+            >
               Architecture
+              <ChevronDown size={14} className={`transition-transform duration-200 ${isArchOpen ? 'rotate-180' : ''}`} />
             </button>
-            <div className="absolute top-full left-0 mt-1 w-48 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col overflow-hidden z-50">
-              <Link href="/architecture" className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50 border-b border-zinc-800/50">
-                System Overview
-              </Link>
-              <Link href="/architecture/workflow" className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50">
-                ComfyUI Tensor Graph
-              </Link>
-            </div>
+            
+            {/* Conditional Rendering of the Dropdown Menu */}
+            {isArchOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl flex flex-col overflow-hidden z-50">
+                <Link 
+                  href="/architecture" 
+                  onClick={() => setIsArchOpen(false)} // Close menu on click
+                  className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50 border-b border-zinc-800/50"
+                >
+                  System Overview
+                </Link>
+                <Link 
+                  href="/architecture/workflow" 
+                  onClick={() => setIsArchOpen(false)} // Close menu on click
+                  className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50"
+                >
+                  ComfyUI Tensor Graph
+                </Link>
+              </div>
+            )}
           </div>
+
           <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
           
           <div className="h-4 w-px bg-zinc-800 mx-2"></div>
@@ -68,7 +100,7 @@ export default function Navbar() {
           {user ? (
             <button 
               onClick={handleSignOut} 
-              className="text-zinc-400 hover:text-red-400 px-4 py-2 font-medium transition-colors flex items-center gap-2"
+              className="text-zinc-400 hover:text-red-400 px-4 py-2 font-medium transition-colors flex items-center gap-2 focus:outline-none"
             >
               <LogOut size={14} />
               Sign Out
