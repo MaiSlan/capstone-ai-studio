@@ -148,10 +148,10 @@ export default function StudioDashboard() {
     if (gpuTimerRef.current) clearTimeout(gpuTimerRef.current);
     if (gpuStatus === 'Standby') {
       setGpuStatus('Waking');
-      setTimeout(() => setGpuStatus('Active'), 15000); 
     }
     
     try {
+      // 1. Kickoff the background worker (Returns instantly in ~100ms)
       const res = await fetch(`${API_BASE}/render-image`, {
         method: 'POST',
         headers: { 
@@ -167,41 +167,78 @@ export default function StudioDashboard() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.detail || 'Failed to generate asset.');
+        throw new Error(errorData.detail || 'Failed to queue rendering pipeline.');
       }
 
-      const data = await res.json();
-      
-      const newEntry: CharacterData = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        theme,
-        lore,
-        optimized_prompt: optimizedPrompt,
-        images: data.images
-      };
-      
-      setCharacterData(newEntry);
-      
-      const updatedHistory = [newEntry, ...history].slice(0, 15);
-      setHistory(updatedHistory);
-      localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
-      
-      setPhase(4);
-      
-      if (user) {
-        const { data: profileData } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
-        if (profileData) setTokens(profileData.tokens);
-      }
+      const queueData = await res.json();
+      const jobId = queueData.generation_id; // Get the database tracker ID
 
-      setGpuStatus('Active');
-      gpuTimerRef.current = setTimeout(() => { setGpuStatus('Standby'); }, 5 * 60 * 1000);
+      // 2. Start Polling the background task every 3 seconds
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${API_BASE}/render-status/${jobId}`, {
+            headers: { 'Authorization': `Bearer ${jwtToken}` }
+          });
+          
+          if (!statusRes.ok) return; // Ignore slight network hiccups and keep trying
+          const job = await statusRes.json();
+
+          // SCENARIO A: The GPU finished successfully!
+          if (job.status === 'completed') {
+            clearInterval(pollInterval); // Stop asking the server
+            
+            // Build the character data using the new database response
+            const newEntry: CharacterData = {
+              id: jobId, // Using the true database UUID
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              theme,
+              lore,
+              optimized_prompt: optimizedPrompt,
+              images: [job.image_data] // Wrap the single base64 string in an array for compatibility
+            };
+            
+            setCharacterData(newEntry);
+            
+            // Update Workspace History
+            const updatedHistory = [newEntry, ...history].slice(0, 15);
+            setHistory(updatedHistory);
+            localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
+            
+            setPhase(4);
+            
+            // Update Token Balance Live
+            if (user) {
+              const { data: profileData } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
+              if (profileData) setTokens(profileData.tokens);
+            }
+
+            // Manage GPU Status
+            setGpuStatus('Active');
+            gpuTimerRef.current = setTimeout(() => { setGpuStatus('Standby'); }, 5 * 60 * 1000);
+            
+            setLoading(false); // Finally turn off the loading UI
+          } 
+          
+          // SCENARIO B: The GPU crashed (e.g. CUDA Out of Memory)
+          else if (job.status === 'failed') {
+            clearInterval(pollInterval);
+            setError("The GPU encountered a critical error during execution. Your token was not deducted.");
+            setGpuStatus('Standby');
+            setLoading(false);
+          }
+          
+          // SCENARIO C: 'processing' -> Do nothing, the loop will run again in 3 seconds.
+
+        } catch (pollErr) {
+          console.error("Polling step slipped, retrying...", pollErr);
+        }
+      }, 3000); // 3000ms = 3 seconds
 
     } catch (err: any) {
-      setError(err.message);
+      // This only catches errors if the INITIAL queue request fails
+      setError(err.message || "Pipeline orchestration severed.");
       setGpuStatus('Standby');
-    } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 

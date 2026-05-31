@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
@@ -121,65 +121,82 @@ async def optimize_tags(req: OptimizeRequest):
         
     return {"optimized_prompt": response.content}
 
-@app.post("/api/v1/render-image")
-async def render_image(req: RenderRequest, user = Depends(verify_token)):
-    """Phase 3: Executes the Modal GPU workflow and deducts a token. (PAID)"""
+# Helper function that runs completely detached in the background
+def orchestrate_gpu_background(generation_id: str, user_id: str, req_optimized_prompt: str, req_theme: str, req_lore: str):
+    import requests
+    import json
+    import os
     
-    # 1. SERVER-SIDE BALANCE CHECK
-    profile_res = supabase.table("profiles").select("tokens").eq("id", user.id).execute()
-    if not profile_res.data or profile_res.data[0]["tokens"] <= 0:
-        raise HTTPException(status_code=402, detail="Payment Required: Insufficient tokens.")
+    final_prompt = "score_9, score_8_up, score_7_up, masterpiece, flat colors, " + req_optimized_prompt
     
-    # 2. INJECT PAYLOAD INTO JSON WORKFLOW
-    final_prompt = "score_9, score_8_up, score_7_up, masterpiece, chibi, super deformed, full body, standing, side faced, flat colors, white background, " + req.optimized_prompt
-    
-    with open("workflows/character_template.json", "r") as f:
-        comfy_workflow = json.load(f)
-        
-    comfy_workflow["9"]["inputs"]["text"] = final_prompt 
-    
-    modal_payload = comfy_workflow 
-    modal_url = os.getenv("MODAL_WEBHOOK_URL")
-    
-    # 3. FIRE THE GPU
-    print("--> Orchestrating Modal Cloud GPU...")
     try:
-        response = requests.post(modal_url, json=modal_payload, timeout=90)
+        with open("workflows/character_template.json", "r") as f:
+            comfy_workflow = json.load(f)
+            
+        comfy_workflow["9"]["inputs"]["text"] = final_prompt 
+        modal_url = os.getenv("MODAL_WEBHOOK_URL")
+        
+        response = requests.post(modal_url, json=comfy_workflow, timeout=90)
         response.raise_for_status()
         modal_data = response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Modal Engine Error: {str(e)}")
-
-    # Ensure modal_data is actually a dictionary before accessing
-    if not isinstance(modal_data, dict):
-        raise HTTPException(status_code=500, detail="Invalid response format from GPU.")
         
-    raw_images = modal_data.get("images", [])
+        raw_images = modal_data.get("images", [])
+        valid_images = [img for img in raw_images if isinstance(img, str) and len(img) > 100]
+        
+        if valid_images:
+            # Task Succeeded: Save the image data and flip status to completed
+            supabase.table("generations").update({
+                "status": "completed",
+                "image_data": valid_images[0] # Save the primary base64 image string
+            }).eq("id", generation_id).execute()
+            
+            # Securely charge the token only on a true absolute success
+            supabase.rpc("decrement_token", {"target_user_id": user_id}).execute()
+        else:
+            raise Exception("No valid image matrices returned from tensor grid.")
+            
+    except Exception as e:
+        print(f"Background GPU Task Failed for job {generation_id}: {str(e)}")
+        # Task Failed: Update status so the frontend can display the crash gracefully
+        supabase.table("generations").update({"status": "failed"}).eq("id", generation_id).execute()
+
+
+@app.post("/api/v1/render-image")
+async def render_image(req: RenderRequest, background_tasks: BackgroundTasks, user = Depends(verify_token)):
+    """Phase 3: Instantly registers a background worker job to prevent gateway timeouts."""
     
-    # Aggressively filter out nulls, empty strings, and errors. 
-    # A true base64 image string is massive, so we check if it is > 100 characters.
-    valid_images = [img for img in raw_images if isinstance(img, str) and len(img) > 100]
-
-    if not valid_images:
-        error_msg = modal_data.get("error", "ComfyUI failed to generate a tensor output.")
-        raise HTTPException(status_code=500, detail=f"GPU Pipeline Failed: {error_msg}")
-
-    supabase.table("generations").insert({
+    # 1. Create a secure tracking slot in the global database ledger instantly
+    insert_res = supabase.table("generations").insert({
         "user_id": user.id,
         "theme": req.theme,
         "lore": req.lore,
-        "optimized_prompt": req.optimized_prompt
+        "optimized_prompt": req.optimized_prompt,
+        "status": "processing"
     }).execute()
-
-    # 4. SECURE ATOMIC DECREMENT 
-    supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
     
-    return {"images": valid_images}
-
-    # 4. SECURE ATOMIC DECREMENT (Only runs if a valid image actually exists!)
-    supabase.rpc("decrement_token", {"target_user_id": user.id}).execute()
+    if not insert_res.data:
+        raise HTTPException(status_code=500, detail="Failed to initialize system logging slot.")
+        
+    generation_id = insert_res.data[0]["id"]
     
-    return {"images": valid_images}
+    # 2. Delegate the 65-second GPU cold start to an isolated background thread
+    background_tasks.add_task(
+        orchestrate_gpu_background, 
+        generation_id, user.id, req.optimized_prompt, req.theme, req.lore
+    )
+    
+    # 3. Hand control back to Next.js in 100 milliseconds so the browser never experiences a timeout
+    return {"status": "queued", "generation_id": generation_id}
+
+
+# 3. Add a lightning-fast status checker endpoint
+@app.get("/api/v1/render-status/{generation_id}")
+async def check_render_status(generation_id: str, user = Depends(verify_token)):
+    """Allows the frontend to loop-check on background worker status securely."""
+    res = supabase.table("generations").select("status", "image_data").eq("id", generation_id).single().execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Job footprint not found.")
+    return res.data
 
 # ==========================================
 # 5. ADMIN UTILITIES
