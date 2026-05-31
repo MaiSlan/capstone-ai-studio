@@ -96,7 +96,7 @@ export default function StudioDashboard() {
     setTimeout(() => setPipelineStep(3), 6000); 
     
     try {
-      const response = await fetch('https://ai-studio-engine.onrender.com/api/v1/generate-character', {
+      const response = await fetch('https://capstone-ai-studio.onrender.com/api/v1/generate-character', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
