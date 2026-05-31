@@ -67,24 +67,27 @@ export default function AdminDashboard() {
         .limit(100);
       if (ledgerData) setGenerations(ledgerData as any);
 
-      // INSTANTLY SHOW THE UI
       setLoading(false);
 
       // 4. Fetch FinOps Telemetry (IN THE BACKGROUND)
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         try {
-          // This happens silently while the admin is already looking at the dashboard
           const billingRes = await fetch('https://capstone-ai-studio.onrender.com/api/v1/admin/billing', {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
           });
           
           if (billingRes.ok) {
             const parsedData = await billingRes.json();
+            
+            console.log("💰 RAW MODAL FINOPS DATA:", parsedData.data);
+            
             let totalSpend = 0;
-            // Ensure data exists before reducing
             if (parsedData.data && Array.isArray(parsedData.data)) {
-              totalSpend = parsedData.data.reduce((sum: number, item: any) => sum + (parseFloat(item.cost || item.total_cost || item.amount || 0)), 0);
+              totalSpend = parsedData.data.reduce((sum: number, item: any) => {
+                const itemCost = item.cost || item.total_cost || item.amount || item.usage || item.spend || item.total || 0;
+                return sum + parseFloat(itemCost);
+              }, 0);
             }
             setFinancialSpend(totalSpend);
           }
