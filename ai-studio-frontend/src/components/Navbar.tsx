@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Terminal, LogOut, ChevronDown } from 'lucide-react';
+import { Terminal, LogOut, ChevronDown, Shield } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function Navbar() {
