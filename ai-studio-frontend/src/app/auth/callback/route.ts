@@ -10,7 +10,9 @@ export async function GET(request: Request) {
   const next = '/studio'
 
   if (code) {
-    const cookieStore = cookies()
+    // FIX: In Next.js 15+, cookies() returns a Promise that must be awaited
+    const cookieStore = await cookies() 
+    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
