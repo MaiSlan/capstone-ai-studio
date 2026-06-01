@@ -32,6 +32,8 @@ export default function FlufforiaStudio() {
   const [optimizedPrompt, setOptimizedPrompt] = useState('');
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
   const [history, setHistory] = useState<CharacterData[]>([]);
+  const [appearancePart, setAppearancePart] = useState('');
+  const [backstoryPart, setBackstoryPart] = useState('');
   
   // System States
   const [loading, setLoading] = useState(false);
@@ -75,7 +77,14 @@ export default function FlufforiaStudio() {
       });
       if (!res.ok) throw new Error('Failed to generate backstory.');
       const data = await res.json();
-      setLore(data.lore);
+      
+      setLore(data.lore); // Keep the master string safe
+      
+      // Split the text visually for the user
+      const parts = data.lore.split('\n\n');
+      setAppearancePart(parts[0] || '');
+      setBackstoryPart(parts.slice(1).join('\n\n') || '');
+      
       setPhase(2);
     } catch (err: any) {
       setError(err.message);
@@ -92,7 +101,7 @@ export default function FlufforiaStudio() {
       const res = await fetch(`${API_BASE}/optimize-tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lore }),
+        body: JSON.stringify({ lore: `${appearancePart}\n\n${backstoryPart}` }),
       });
       if (!res.ok) throw new Error('Failed to optimize tags.');
       const data = await res.json();
@@ -233,28 +242,23 @@ export default function FlufforiaStudio() {
   // ==========================================
   
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-[#FFFAF0] flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)]">
+    <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)]">
       
-      {/* Header Info (Tokens & GPU) */}
-      <div className="w-full max-w-3xl flex justify-end gap-3 mb-4 animate-fade-in">
-         {tokens !== null && (
-          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white border border-pink-100 text-pink-500 shadow-sm">
-            <Sparkles size={14} /> {tokens} Tokens
-          </span>
-        )}
-        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white border border-pink-100 text-zinc-500 shadow-sm">
-          <Cpu size={14} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-400'} />
-          GPU: {gpuStatus}
-        </span>
-      </div>
-
       {/* THE MORPHING CARD */}
       <div className={`
         bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-pink-100 overflow-hidden relative transition-all duration-700 ease-in-out
         ${phase === 1 ? 'max-w-xl w-full' : phase === 4 ? 'max-w-3xl w-full' : 'max-w-2xl w-full'}
       `}>
         
-        {/* PROGRESS BAR (Hidden in Phase 4) */}
+        {/* INNER GPU STATUS PILL */}
+        <div className="absolute top-6 right-6 z-10 hidden sm:block">
+           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-widest bg-zinc-50 border border-zinc-100 text-zinc-500 shadow-sm">
+            <Cpu size={12} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-300'} />
+            GPU: {gpuStatus}
+          </span>
+        </div>
+
+        {/* PROGRESS BAR */}
         {phase < 4 && (
           <div className="h-1.5 w-full bg-pink-50">
             <div 
@@ -274,7 +278,7 @@ export default function FlufforiaStudio() {
 
           {/* PHASE 1: CONCEPT INPUT */}
           {phase === 1 && (
-            <form onSubmit={handleDraftLore} className="flex flex-col items-center text-center space-y-6 animate-fade-in">
+            <form onSubmit={handleDraftLore} className="flex flex-col items-center text-center space-y-6 animate-fade-in mt-4">
               <div className="h-16 w-16 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center mb-2 shadow-inner">
                 <Sparkles size={32} />
               </div>
@@ -301,48 +305,111 @@ export default function FlufforiaStudio() {
             </form>
           )}
 
-          {/* PHASE 2 & 3: LORE & TAG REFINEMENT */}
-          {(phase === 2 || phase === 3) && (
+          {/* PHASE 2: SPLIT LORE EDITING */}
+          {phase === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <h2 className="text-2xl font-bold text-zinc-800 flex items-center gap-2" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-                  {phase === 2 ? <><BookOpen size={24} className="text-pink-400"/> System Lore</> : <><Terminal size={24} className="text-pink-400"/> Cloud Tags</>}
+                  <BookOpen size={24} className="text-pink-400"/> System Lore
                 </h2>
                 <span className="text-xs font-bold uppercase tracking-wider text-pink-400 bg-pink-50 px-3 py-1 rounded-full">
-                  Step {phase} of 3
+                  Step 2 of 3
                 </span>
               </div>
               
-              <p className="text-sm text-zinc-500">
-                {phase === 2 ? "Review and adjust the AI-generated backstory." : "These are the precise ComfyUI instructions. Adjust if needed."}
-              </p>
+              <p className="text-sm text-zinc-500">Review and adjust the AI-generated backstory and appearance.</p>
 
-              <div className="bg-zinc-50 rounded-2xl p-2 border border-zinc-100 shadow-inner">
-                <textarea
-                    value={phase === 2 ? lore : optimizedPrompt}
-                    onChange={(e) => phase === 2 ? setLore(e.target.value) : setOptimizedPrompt(e.target.value)}
-                    disabled={loading}
-                    className={`w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none ${phase === 3 ? 'font-mono' : ''}`}
-                  />
+              <div className="space-y-4">
+                {/* Visual Appearance Block */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 pl-1">Visual Appearance</label>
+                  <div className="bg-zinc-50 rounded-2xl p-1 border border-zinc-100 shadow-inner">
+                    <textarea
+                        value={appearancePart}
+                        onChange={(e) => setAppearancePart(e.target.value)}
+                        disabled={loading}
+                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none"
+                      />
+                  </div>
+                </div>
+
+                {/* Backstory Block */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 pl-1">Character Backstory</label>
+                  <div className="bg-zinc-50 rounded-2xl p-1 border border-zinc-100 shadow-inner">
+                    <textarea
+                        value={backstoryPart}
+                        onChange={(e) => setBackstoryPart(e.target.value)}
+                        disabled={loading}
+                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none"
+                      />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button 
-                  onClick={() => setPhase(phase - 1)} 
+                  onClick={() => setPhase(1)} 
                   disabled={loading}
                   className="px-6 py-4 rounded-2xl font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors disabled:opacity-50"
                 >
                   Back
                 </button>
                 <button 
-                  onClick={phase === 2 ? handleOptimizeTags : handleRenderImage}
-                  disabled={loading || (phase === 3 && tokens !== null && tokens <= 0)}
+                  onClick={handleOptimizeTags}
+                  disabled={loading}
+                  className="flex-1 bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+                >
+                  {loading ? (
+                    <><Loader2 size={18} className="animate-spin" /> Processing...</>
+                  ) : (
+                    <>Generate Tags (Free) <ArrowRight size={18} /></>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* PHASE 3: TAG REFINEMENT */}
+          {phase === 3 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                <h2 className="text-2xl font-bold text-zinc-800 flex items-center gap-2" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                  <Terminal size={24} className="text-pink-400"/> Cloud Tags
+                </h2>
+                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 bg-pink-50 px-3 py-1 rounded-full">
+                  Step 3 of 3
+                </span>
+              </div>
+              
+              <p className="text-sm text-zinc-500">These are the precise ComfyUI instructions. Adjust if needed.</p>
+
+              <div className="bg-zinc-50 rounded-2xl p-2 border border-zinc-100 shadow-inner">
+                <textarea
+                    value={optimizedPrompt}
+                    onChange={(e) => setOptimizedPrompt(e.target.value)}
+                    disabled={loading}
+                    className="w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 font-mono custom-scrollbar resize-none"
+                  />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setPhase(2)} 
+                  disabled={loading}
+                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button 
+                  onClick={handleRenderImage}
+                  disabled={loading || (tokens !== null && tokens <= 0)}
                   className="flex-1 bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
                 >
                   {loading ? (
                     <><Loader2 size={18} className="animate-spin" /> {loadingMessage || 'Processing...'}</>
                   ) : (
-                    <>{phase === 2 ? 'Generate Tags (Free)' : 'Render Asset (1 Token)'} <ArrowRight size={18} /></>
+                    <>Render Asset (1 Token) <ArrowRight size={18} /></>
                   )}
                 </button>
               </div>

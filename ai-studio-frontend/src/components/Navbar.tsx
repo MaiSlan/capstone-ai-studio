@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Terminal, LogOut, ChevronDown, Shield } from 'lucide-react';
+import { LogOut, ChevronDown, Shield, Sparkles, BookHeart, User } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function Navbar() {
@@ -13,33 +13,36 @@ export default function Navbar() {
   
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('user');
+  const [tokens, setTokens] = useState<number | null>(null);
   const [isArchOpen, setIsArchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 1. Created a dedicated function to fetch the role
-    const fetchRole = async (userId: string) => {
-      const { data } = await supabase.from('profiles').select('role').eq('id', userId).single();
-      if (data) setUserRole(data.role);
+    const fetchUserData = async (userId: string) => {
+      const { data } = await supabase.from('profiles').select('role, tokens').eq('id', userId).single();
+      if (data) {
+        setUserRole(data.role);
+        setTokens(data.tokens);
+      }
     };
 
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        fetchRole(session.user.id); // Fetch role on mount
+        fetchUserData(session.user.id);
       }
     };
     
     getUser();
 
-    // 2. Updated the listener to fetch the new role whenever accounts switch
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchRole(session.user.id);
+        fetchUserData(session.user.id);
       } else {
-        setUserRole('user'); // Reset role to default if logged out
+        setUserRole('user');
+        setTokens(null);
       }
     });
 
@@ -54,7 +57,7 @@ export default function Navbar() {
       authListener.subscription.unsubscribe();
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [pathname]); // Re-fetch if route changes to keep tokens fresh
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -65,75 +68,73 @@ export default function Navbar() {
   if (pathname === '/auth') return null;
 
   return (
-    <nav className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+    <div className="fixed top-6 left-0 right-0 z-50 flex justify-center w-full px-4 pointer-events-none">
+      <nav className="pointer-events-auto w-full max-w-5xl bg-white/80 backdrop-blur-md border border-pink-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] rounded-full px-6 h-16 flex items-center justify-between transition-all duration-300">
         
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="h-8 w-8 rounded bg-green-500 flex items-center justify-center text-zinc-950 font-bold tracking-tighter">AI</div>
-          <span className="font-medium tracking-tight text-sm text-zinc-50">STUDIO // ENGINE</span>
+        {/* BRANDING */}
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <div className="h-8 w-8 rounded-xl bg-pink-100 flex items-center justify-center text-pink-500 shadow-sm">
+            <Sparkles size={16} />
+          </div>
+          <span className="font-bold text-lg text-pink-500 tracking-wide" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+            Flufforia
+          </span>
         </Link>
 
-        <div className="flex items-center gap-6 text-sm">
+        {/* LINKS */}
+        <div className="flex items-center gap-6 text-sm font-medium">
           
-          {/* Architecture Click Dropdown */}
           <div className="relative py-2" ref={dropdownRef}>
             <button 
               onClick={() => setIsArchOpen(!isArchOpen)}
-              className={`flex items-center gap-1.5 transition-colors focus:outline-none ${isArchOpen ? 'text-zinc-50' : 'text-zinc-400 hover:text-zinc-50'}`}
+              className={`flex items-center gap-1.5 transition-colors focus:outline-none ${isArchOpen ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-400'}`}
             >
-              Architecture
+              Documentation
               <ChevronDown size={14} className={`transition-transform duration-200 ${isArchOpen ? 'rotate-180' : ''}`} />
             </button>
             
             {isArchOpen && (
-              <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl flex flex-col overflow-hidden z-50">
-                <Link 
-                  href="/architecture" 
-                  onClick={() => setIsArchOpen(false)}
-                  className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50 border-b border-zinc-800/50"
-                >
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-48 bg-white border border-pink-100 rounded-2xl shadow-xl flex flex-col overflow-hidden z-50 py-2">
+                <Link href="/architecture" onClick={() => setIsArchOpen(false)} className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-pink-50 hover:text-pink-500 transition-colors">
                   System Overview
                 </Link>
-                <Link 
-                  href="/architecture/workflow" 
-                  onClick={() => setIsArchOpen(false)}
-                  className="px-4 py-3 text-xs font-medium text-zinc-400 hover:bg-zinc-900 hover:text-zinc-50"
-                >
-                  ComfyUI Tensor Graph
+                <Link href="/architecture/workflow" onClick={() => setIsArchOpen(false)} className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-pink-50 hover:text-pink-500 transition-colors">
+                  Tensor Graph
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Admin Link (Only visible to admins) */}
+          <Link href="/creations" className="text-zinc-500 hover:text-pink-400 transition-colors">My Creations</Link>
+          <Link href="/studio" className="text-zinc-500 hover:text-pink-400 transition-colors">Studio</Link>
+
           {userRole === 'admin' && (
-            <Link href="/admin" className="text-zinc-400 hover:text-green-400 font-medium transition-colors flex items-center gap-1.5">
-              <Shield size={14} /> Admin
+            <Link href="/admin" className="text-zinc-400 hover:text-purple-500 transition-colors flex items-center gap-1.5 bg-zinc-50 px-3 py-1.5 rounded-full border border-zinc-100">
+              <Shield size={12} /> Admin
             </Link>
           )}
 
-          {/* Fixed: Only one Workspace link now! */}
-          <Link href="/studio" className="text-zinc-400 hover:text-zinc-50 transition-colors">Workspace</Link>
+          <div className="h-6 w-px bg-pink-100 mx-1"></div>
           
-          <div className="h-4 w-px bg-zinc-800 mx-2"></div>
-          
-          {/* Dynamic Auth Button */}
+          {/* AUTH & TOKENS */}
           {user ? (
-            <button 
-              onClick={handleSignOut} 
-              className="text-zinc-400 hover:text-red-400 px-4 py-2 font-medium transition-colors flex items-center gap-2 focus:outline-none"
-            >
-              <LogOut size={14} />
-              Sign Out
-            </button>
+            <div className="flex items-center gap-3">
+              {tokens !== null && (
+                <span className="flex items-center gap-1.5 text-xs font-bold text-pink-500 bg-pink-50 px-3 py-1.5 rounded-full">
+                  <Sparkles size={12} /> {tokens}
+                </span>
+              )}
+              <button onClick={handleSignOut} className="text-zinc-400 hover:text-red-400 p-2 transition-colors flex items-center justify-center rounded-full hover:bg-red-50">
+                <LogOut size={16} />
+              </button>
+            </div>
           ) : (
-            <Link href="/auth" className="bg-zinc-100 hover:bg-zinc-200 text-zinc-950 px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
-              <Terminal size={14} />
-              Sign In
+            <Link href="/auth" className="bg-pink-400 hover:bg-pink-500 text-white px-5 py-2 rounded-full transition-all shadow-[0_2px_0_rgba(244,114,182,0.4)] hover:translate-y-[1px] flex items-center gap-2">
+              <User size={14} /> Sign In
             </Link>
           )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 }
