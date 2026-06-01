@@ -23,6 +23,9 @@ export default function FlufforiaStudio() {
 
   const [user, setUser] = useState<any>(null);
   const [tokens, setTokens] = useState<number | null>(null);
+  
+  // FIX: Added authenticating state to prevent premature rendering and bouncing
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
 
   const [phase, setPhase] = useState<number>(1);
   const [theme, setTheme] = useState('');
@@ -41,20 +44,25 @@ export default function FlufforiaStudio() {
   
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/auth');
+      // FIX: getUser() is strictly validated by the server, preventing false "null" reads from stale local storage
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        router.replace('/auth');
         return;
       }
-      setUser(session.user);
-      const { data: profile } = await supabase.from('profiles').select('tokens').eq('id', session.user.id).single();
+      
+      setUser(user);
+      const { data: profile } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
       if (profile) setTokens(profile.tokens);
 
       const savedHistory = localStorage.getItem('aiStudioHistory');
       if (savedHistory) setHistory(JSON.parse(savedHistory));
+      
+      setIsAuthenticating(false); // Only show the page once fully verified
     };
     init();
-  }, [router, supabase]);
+  }, [router]); // Removed supabase from dependency array to prevent re-render loops
 
   const handleDraftLore = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -207,6 +215,11 @@ export default function FlufforiaStudio() {
     setPhase(1);
     setError(null);
   };
+
+  // FIX: Prevent the page from rendering anything until the session is 100% verified
+  if (isAuthenticating) {
+    return <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700"></div>;
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">

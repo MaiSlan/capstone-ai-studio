@@ -17,7 +17,6 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Apply the global theme to the auth page background on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('flufforia-theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
@@ -33,24 +32,30 @@ export default function AuthPage() {
       if (isLogin) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-        router.push('/studio');
+        
+        // FIX: Force Next.js to sync the new cookie state globally
+        router.refresh();
+        
+        // FIX: Add a tiny micro-delay to ensure the session is written before navigating
+        setTimeout(() => {
+          router.push('/studio');
+        }, 100);
+
       } else {
         const { error: signUpError } = await supabase.auth.signUp({ email, password });
         if (signUpError) throw signUpError;
         setMessage('Registration successful! Please check your email to verify your account.');
-        setIsLogin(true); // Switch back to login view smoothly
+        setIsLogin(true); 
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      setLoading(false); // Only stop loading if there's an error
+    } 
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       
-      {/* Back to Home Button */}
       <Link 
         href="/" 
         className="absolute top-8 left-8 text-zinc-500 dark:text-zinc-400 hover:text-pink-500 dark:hover:text-purple-400 flex items-center gap-2 text-sm font-medium transition-colors bg-white/50 dark:bg-zinc-900/50 backdrop-blur px-4 py-2 rounded-full border border-pink-100 dark:border-zinc-800 shadow-sm"
@@ -60,14 +65,12 @@ export default function AuthPage() {
 
       <div className="w-full max-w-md animate-fade-in">
         
-        {/* Brand Icon */}
         <div className="flex justify-center mb-8">
           <div className="h-16 w-16 rounded-2xl bg-pink-100 dark:bg-purple-900/50 flex items-center justify-center text-pink-500 dark:text-purple-400 shadow-sm transform -rotate-3 transition-colors">
             <Sparkles size={32} />
           </div>
         </div>
 
-        {/* The Card */}
         <div className="bg-white dark:bg-zinc-900/90 backdrop-blur-md rounded-[2rem] p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] border border-pink-100 dark:border-purple-500/30 transition-all duration-700">
           
           <div className="text-center mb-8">
@@ -137,7 +140,6 @@ export default function AuthPage() {
             </button>
           </form>
 
-          {/* Toggle Form State */}
           <div className="mt-8 text-center">
             <button
               type="button"
