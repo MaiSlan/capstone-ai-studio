@@ -21,28 +21,24 @@ export default function FlufforiaStudio() {
   const router = useRouter();
   const supabase = createClient();
 
-  // Authentication & Economy States
   const [user, setUser] = useState<any>(null);
   const [tokens, setTokens] = useState<number | null>(null);
 
-  // Pipeline States
   const [phase, setPhase] = useState<number>(1);
   const [theme, setTheme] = useState('');
   const [lore, setLore] = useState('');
+  const [appearancePart, setAppearancePart] = useState('');
+  const [backstoryPart, setBackstoryPart] = useState('');
   const [optimizedPrompt, setOptimizedPrompt] = useState('');
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
   const [history, setHistory] = useState<CharacterData[]>([]);
-  const [appearancePart, setAppearancePart] = useState('');
-  const [backstoryPart, setBackstoryPart] = useState('');
   
-  // System States
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [gpuStatus, setGpuStatus] = useState<'Standby' | 'Waking' | 'Active'>('Standby');
   const gpuTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Auth Check on Mount
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -60,10 +56,6 @@ export default function FlufforiaStudio() {
     init();
   }, [router, supabase]);
 
-  // ==========================================
-  // PIPELINE FUNCTIONS 
-  // ==========================================
-  
   const handleDraftLore = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!theme.trim()) return;
@@ -78,9 +70,7 @@ export default function FlufforiaStudio() {
       if (!res.ok) throw new Error('Failed to generate backstory.');
       const data = await res.json();
       
-      setLore(data.lore); // Keep the master string safe
-      
-      // Split the text visually for the user
+      setLore(data.lore);
       const parts = data.lore.split('\n\n');
       setAppearancePart(parts[0] || '');
       setBackstoryPart(parts.slice(1).join('\n\n') || '');
@@ -119,31 +109,20 @@ export default function FlufforiaStudio() {
     
     const { data: { session } } = await supabase.auth.getSession();
     const jwtToken = session?.access_token;
-    if (!jwtToken) {
-      setError("Authentication required.");
-      return;
-    }
+    if (!jwtToken) { setError("Authentication required."); return; }
     
-    if (tokens !== null && tokens <= 0) {
-      setError("Insufficient tokens.");
-      return;
-    }
+    if (tokens !== null && tokens <= 0) { setError("Insufficient tokens."); return; }
 
     setLoading(true);
     setError(null);
     
     if (gpuTimerRef.current) clearTimeout(gpuTimerRef.current);
-    if (gpuStatus === 'Standby') {
-      setGpuStatus('Waking');
-    }
+    if (gpuStatus === 'Standby') setGpuStatus('Waking');
     
     try {
       const res = await fetch(`${API_BASE}/render-image`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${jwtToken}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtToken}` },
         body: JSON.stringify({ theme, lore, optimized_prompt: optimizedPrompt }),
       });
 
@@ -159,10 +138,7 @@ export default function FlufforiaStudio() {
       
       const pollInterval = setInterval(async () => {
         try {
-          const statusRes = await fetch(`${API_BASE}/render-status/${jobId}`, {
-            headers: { 'Authorization': `Bearer ${jwtToken}` }
-          });
-          
+          const statusRes = await fetch(`${API_BASE}/render-status/${jobId}`, { headers: { 'Authorization': `Bearer ${jwtToken}` } });
           if (!statusRes.ok) return; 
           const job = await statusRes.json();
 
@@ -172,15 +148,11 @@ export default function FlufforiaStudio() {
             const newEntry: CharacterData = {
               id: jobId,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              theme,
-              lore,
-              optimized_prompt: optimizedPrompt,
-              images: [job.image_base64] 
+              theme, lore, optimized_prompt: optimizedPrompt, images: [job.image_base64] 
             };
             
             setCharacterData(newEntry);
             
-            // Persist to history for the future /creations page
             const updatedHistory = [newEntry, ...history].slice(0, 15);
             setHistory(updatedHistory);
             localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
@@ -205,9 +177,7 @@ export default function FlufforiaStudio() {
           } else {
             setLoadingMessage(prev => prev.includes("Warming") ? "Executing Tensor K-Sampler math..." : "Refining final details...");
           }
-        } catch (pollErr) {
-          console.error("Polling slipped, retrying...", pollErr);
-        }
+        } catch (pollErr) { console.error("Polling slipped, retrying...", pollErr); }
       }, 3000);
 
     } catch (err: any) {
@@ -220,7 +190,6 @@ export default function FlufforiaStudio() {
   const handleDownload = () => {
     if (!characterData?.images?.[0]) return;
     const a = document.createElement('a');
-    // Ensure base64 prefix is attached for downloading
     a.href = `data:image/png;base64,${characterData.images[0]}`;
     a.download = `flufforia-asset-${characterData.id}.png`;
     document.body.appendChild(a);
@@ -231,38 +200,45 @@ export default function FlufforiaStudio() {
   const startOver = () => {
     setTheme('');
     setLore('');
+    setAppearancePart('');
+    setBackstoryPart('');
     setOptimizedPrompt('');
     setCharacterData(null);
     setPhase(1);
     setError(null);
   };
 
-  // ==========================================
-  // UI RENDER
-  // ==========================================
-  
   return (
-    <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)]">
+    <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       
+      {/* Header Info (Tokens & GPU) */}
+      <div className="w-full max-w-3xl flex justify-end gap-3 mb-4 animate-fade-in">
+         {tokens !== null && (
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white dark:bg-zinc-900 border border-pink-100 dark:border-purple-500/30 text-pink-500 dark:text-purple-400 shadow-sm transition-colors">
+            <Sparkles size={14} /> {tokens} Tokens
+          </span>
+        )}
+      </div>
+
       {/* THE MORPHING CARD */}
       <div className={`
-        bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-pink-100 overflow-hidden relative transition-all duration-700 ease-in-out
+        bg-white dark:bg-zinc-900/90 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] border border-pink-100 dark:border-purple-500/30 overflow-hidden relative transition-all duration-700 ease-in-out
         ${phase === 1 ? 'max-w-xl w-full' : phase === 4 ? 'max-w-3xl w-full' : 'max-w-2xl w-full'}
       `}>
         
         {/* INNER GPU STATUS PILL */}
         <div className="absolute top-6 right-6 z-10 hidden sm:block">
-           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-widest bg-zinc-50 border border-zinc-100 text-zinc-500 shadow-sm">
-            <Cpu size={12} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-300'} />
+           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-widest bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 shadow-sm transition-colors">
+            <Cpu size={12} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-300 dark:text-zinc-600'} />
             GPU: {gpuStatus}
           </span>
         </div>
 
         {/* PROGRESS BAR */}
         {phase < 4 && (
-          <div className="h-1.5 w-full bg-pink-50">
+          <div className="h-1.5 w-full bg-pink-50 dark:bg-zinc-800 transition-colors">
             <div 
-              className="h-full bg-pink-300 transition-all duration-500 ease-out"
+              className="h-full bg-pink-300 dark:bg-purple-500 transition-all duration-500 ease-out"
               style={{ width: `${(phase / 4) * 100}%` }}
             />
           </div>
@@ -271,7 +247,7 @@ export default function FlufforiaStudio() {
         <div className="p-8 md:p-10">
           
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-500 rounded-2xl flex items-center gap-3 text-sm font-medium">
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-2xl flex items-center gap-3 text-sm font-medium transition-colors">
               <AlertCircle size={18} /> {error}
             </div>
           )}
@@ -279,25 +255,25 @@ export default function FlufforiaStudio() {
           {/* PHASE 1: CONCEPT INPUT */}
           {phase === 1 && (
             <form onSubmit={handleDraftLore} className="flex flex-col items-center text-center space-y-6 animate-fade-in mt-4">
-              <div className="h-16 w-16 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center mb-2 shadow-inner">
+              <div className="h-16 w-16 rounded-full bg-pink-100 dark:bg-purple-900/50 text-pink-500 dark:text-purple-400 flex items-center justify-center mb-2 shadow-inner transition-colors">
                 <Sparkles size={32} />
               </div>
               <div>
-                <h2 className="text-3xl font-bold text-zinc-800" style={{ fontFamily: '"Fredoka", sans-serif' }}>Draft a Concept</h2>
-                <p className="text-zinc-500 mt-2 text-sm">Describe the character you want to bring to life. Keep it simple!</p>
+                <h2 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>Draft a Concept</h2>
+                <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm transition-colors">Describe the character you want to bring to life. Keep it simple!</p>
               </div>
               
               <textarea
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
                 placeholder="e.g. A cute witch with an oversized hat..."
-                className="w-full h-32 bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 text-zinc-700 focus:outline-none focus:border-pink-300 focus:bg-white transition-colors resize-none placeholder:text-zinc-400"
+                className="w-full h-32 bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-pink-300 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-zinc-900 transition-colors resize-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
               />
               
               <button 
                 type="submit"
                 disabled={!theme.trim() || loading}
-                className="w-full bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:shadow-[0_2px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+                className="w-full bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:shadow-[0_2px_0_rgba(244,114,182,0.4)] dark:hover:shadow-[0_2px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]"
               >
                 {loading ? <Loader2 size={20} className="animate-spin" /> : <Wand2 size={20} />}
                 {loading ? 'Drafting Magic...' : 'Generate Lore (Free)'}
@@ -308,40 +284,38 @@ export default function FlufforiaStudio() {
           {/* PHASE 2: SPLIT LORE EDITING */}
           {phase === 2 && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-                <h2 className="text-2xl font-bold text-zinc-800 flex items-center gap-2" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-                  <BookOpen size={24} className="text-pink-400"/> System Lore
+              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 transition-colors">
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                  <BookOpen size={24} className="text-pink-400 dark:text-purple-400"/> System Lore
                 </h2>
-                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 bg-pink-50 px-3 py-1 rounded-full">
+                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 dark:text-purple-300 bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full transition-colors">
                   Step 2 of 3
                 </span>
               </div>
               
-              <p className="text-sm text-zinc-500">Review and adjust the AI-generated backstory and appearance.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">Review and adjust the AI-generated backstory and appearance.</p>
 
               <div className="space-y-4">
-                {/* Visual Appearance Block */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 pl-1">Visual Appearance</label>
-                  <div className="bg-zinc-50 rounded-2xl p-1 border border-zinc-100 shadow-inner">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Visual Appearance</label>
+                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
                     <textarea
                         value={appearancePart}
                         onChange={(e) => setAppearancePart(e.target.value)}
                         disabled={loading}
-                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none"
+                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors"
                       />
                   </div>
                 </div>
 
-                {/* Backstory Block */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 pl-1">Character Backstory</label>
-                  <div className="bg-zinc-50 rounded-2xl p-1 border border-zinc-100 shadow-inner">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Character Backstory</label>
+                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
                     <textarea
                         value={backstoryPart}
                         onChange={(e) => setBackstoryPart(e.target.value)}
                         disabled={loading}
-                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none"
+                        className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors"
                       />
                   </div>
                 </div>
@@ -351,14 +325,14 @@ export default function FlufforiaStudio() {
                 <button 
                   onClick={() => setPhase(1)} 
                   disabled={loading}
-                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50"
                 >
                   Back
                 </button>
                 <button 
                   onClick={handleOptimizeTags}
                   disabled={loading}
-                  className="flex-1 bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+                  className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]"
                 >
                   {loading ? (
                     <><Loader2 size={18} className="animate-spin" /> Processing...</>
@@ -373,23 +347,23 @@ export default function FlufforiaStudio() {
           {/* PHASE 3: TAG REFINEMENT */}
           {phase === 3 && (
             <div className="space-y-6 animate-fade-in">
-              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-                <h2 className="text-2xl font-bold text-zinc-800 flex items-center gap-2" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-                  <Terminal size={24} className="text-pink-400"/> Cloud Tags
+              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 transition-colors">
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                  <Terminal size={24} className="text-pink-400 dark:text-purple-400"/> Cloud Tags
                 </h2>
-                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 bg-pink-50 px-3 py-1 rounded-full">
+                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 dark:text-purple-300 bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full transition-colors">
                   Step 3 of 3
                 </span>
               </div>
               
-              <p className="text-sm text-zinc-500">These are the precise ComfyUI instructions. Adjust if needed.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">These are the precise ComfyUI instructions. Adjust if needed.</p>
 
-              <div className="bg-zinc-50 rounded-2xl p-2 border border-zinc-100 shadow-inner">
+              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-2 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
                 <textarea
                     value={optimizedPrompt}
                     onChange={(e) => setOptimizedPrompt(e.target.value)}
                     disabled={loading}
-                    className="w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 font-mono custom-scrollbar resize-none"
+                    className="w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 font-mono custom-scrollbar resize-none transition-colors"
                   />
               </div>
 
@@ -397,14 +371,14 @@ export default function FlufforiaStudio() {
                 <button 
                   onClick={() => setPhase(2)} 
                   disabled={loading}
-                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50"
                 >
                   Back
                 </button>
                 <button 
                   onClick={handleRenderImage}
                   disabled={loading || (tokens !== null && tokens <= 0)}
-                  className="flex-1 bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+                  className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]"
                 >
                   {loading ? (
                     <><Loader2 size={18} className="animate-spin" /> {loadingMessage || 'Processing...'}</>
@@ -422,13 +396,13 @@ export default function FlufforiaStudio() {
               
               <Link 
                 href="/creations" 
-                className="absolute top-6 right-6 z-10 bg-white/90 backdrop-blur hover:bg-white text-zinc-700 font-semibold px-4 py-2 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm opacity-90 hover:opacity-100 transform hover:scale-105"
+                className="absolute top-6 right-6 z-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur hover:bg-white dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-semibold px-4 py-2 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm opacity-90 hover:opacity-100 transform hover:scale-105"
               >
-                <ExternalLink size={16} className="text-pink-500" />
+                <ExternalLink size={16} className="text-pink-500 dark:text-purple-400" />
                 View Details
               </Link>
 
-              <div className="w-full aspect-square bg-zinc-50 relative border-b border-pink-100">
+              <div className="w-full aspect-square bg-zinc-50 dark:bg-zinc-950 relative border-b border-pink-100 dark:border-zinc-800 transition-colors">
                 <img 
                   src={`data:image/png;base64,${characterData.images[0]}`} 
                   alt="Generated Asset" 
@@ -436,17 +410,17 @@ export default function FlufforiaStudio() {
                 />
               </div>
 
-              <div className="p-6 md:p-8 bg-white flex flex-col sm:flex-row gap-4">
+              <div className="p-6 md:p-8 bg-white dark:bg-zinc-900/90 flex flex-col sm:flex-row gap-4 transition-colors">
                 <button 
                   onClick={startOver} 
-                  className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center gap-2"
                 >
                   <Sparkles size={18} />
                   Draft New Concept
                 </button>
                 <button 
                   onClick={handleDownload} 
-                  className="flex-1 bg-pink-400 hover:bg-pink-500 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px] flex items-center justify-center gap-2"
+                  className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px] flex items-center justify-center gap-2"
                 >
                   <Download size={18} />
                   Download Asset
