@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { BookHeart, Sparkles, Download, Clock, Trash2, X, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
 
 interface CharacterData {
   id: string;
@@ -14,14 +16,31 @@ interface CharacterData {
 }
 
 export default function MyCreations() {
+  const router = useRouter();
+  const supabase = createClient();
+  
   const [history, setHistory] = useState<CharacterData[]>([]);
   const [selectedCreation, setSelectedCreation] = useState<CharacterData | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem('aiStudioHistory');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
-  }, []);
+    const checkAuthAndLoadData = async () => {
+      // 1. Instant Route Guard
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/auth');
+        return;
+      }
+      setIsAuthenticating(false);
+
+      // 2. Load Data only if authenticated
+      const savedHistory = localStorage.getItem('aiStudioHistory');
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+    };
+
+    checkAuthAndLoadData();
+  }, [router, supabase]);
 
   const handleDownload = (e: React.MouseEvent, base64String: string, id: string) => {
     e.stopPropagation();
@@ -48,6 +67,11 @@ export default function MyCreations() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  // Prevent UI flash while Supabase verifies the session token
+  if (isAuthenticating) {
+    return <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700"></div>;
+  }
+  
   return (
     <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 pt-32 pb-20 px-6 transition-colors duration-700 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       <div className="max-w-6xl mx-auto">
