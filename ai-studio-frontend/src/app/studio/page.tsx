@@ -1,94 +1,79 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, BookOpen, Terminal, Cpu, CheckCircle2, AlertCircle, Download, History, Trash2, Coins, ArrowRight, RefreshCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Sparkles, Wand2, Download, ExternalLink, Loader2, ArrowRight, CheckCircle2, AlertCircle, BookOpen, Terminal, Cpu } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
+
+const API_BASE = 'https://capstone-ai-studio.onrender.com/api/v1';
 
 interface CharacterData {
-  id?: string;
-  timestamp?: string;
+  id: string;
   theme: string;
   lore: string;
   optimized_prompt: string;
   images: string[];
+  timestamp?: string;
 }
 
-export default function StudioDashboard() {
-  const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  // The Interactive State Machine
-  const [phase, setPhase] = useState<number>(1); // 1: Theme, 2: Lore Edit, 3: Tag Edit, 4: Result
+export default function FlufforiaStudio() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  // Authentication & Economy States
+  const [user, setUser] = useState<any>(null);
+  const [tokens, setTokens] = useState<number | null>(null);
+
+  // Pipeline States
+  const [phase, setPhase] = useState<number>(1);
   const [theme, setTheme] = useState('');
   const [lore, setLore] = useState('');
   const [optimizedPrompt, setOptimizedPrompt] = useState('');
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
-  
   const [history, setHistory] = useState<CharacterData[]>([]);
-  const supabase = createClient();
-  const [user, setUser] = useState<any>(null);
-  const [tokens, setTokens] = useState<number | null>(null);
-
+  
+  // System States
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [gpuStatus, setGpuStatus] = useState<'Standby' | 'Waking' | 'Active'>('Standby');
   const gpuTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const API_BASE = 'https://capstone-ai-studio.onrender.com/api/v1';
-
+  
+  // Auth Check on Mount
   useEffect(() => {
-    setMounted(true);
-    const initWorkspace = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
-        const { data } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
-        if (data) setTokens(data.tokens);
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/auth');
+        return;
       }
+      setUser(session.user);
+      const { data: profile } = await supabase.from('profiles').select('tokens').eq('id', session.user.id).single();
+      if (profile) setTokens(profile.tokens);
+
       const savedHistory = localStorage.getItem('aiStudioHistory');
       if (savedHistory) setHistory(JSON.parse(savedHistory));
     };
-    initWorkspace();
-  }, []);
-
-  const downloadImage = (base64String: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = `data:image/png;base64,${base64String}`;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const clearHistory = () => {
-    localStorage.removeItem('aiStudioHistory');
-    setHistory([]);
-  };
-
-  const startOver = () => {
-    setPhase(1);
-    setTheme('');
-    setLore('');
-    setOptimizedPrompt('');
-    setCharacterData(null);
-    setError(null);
-  };
+    init();
+  }, [router, supabase]);
 
   // ==========================================
-  // PHASE 1: DRAFT LORE (FREE)
+  // PIPELINE FUNCTIONS 
   // ==========================================
-  const handleDraftLore = async (e: React.FormEvent) => {
-    e.preventDefault();
+  
+  const handleDraftLore = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!theme.trim()) return;
     setLoading(true);
     setError(null);
-    
     try {
       const res = await fetch(`${API_BASE}/draft-lore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ theme }),
       });
-      if (!res.ok) throw new Error("Failed to generate backstory.");
+      if (!res.ok) throw new Error('Failed to generate backstory.');
       const data = await res.json();
       setLore(data.lore);
       setPhase(2);
@@ -99,21 +84,17 @@ export default function StudioDashboard() {
     }
   };
 
-  // ==========================================
-  // PHASE 2: OPTIMIZE TAGS (FREE)
-  // ==========================================
   const handleOptimizeTags = async () => {
     if (!lore.trim()) return;
     setLoading(true);
     setError(null);
-    
     try {
       const res = await fetch(`${API_BASE}/optimize-tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lore }),
       });
-      if (!res.ok) throw new Error("Failed to optimize tags.");
+      if (!res.ok) throw new Error('Failed to optimize tags.');
       const data = await res.json();
       setOptimizedPrompt(data.optimized_prompt);
       setPhase(3);
@@ -124,9 +105,6 @@ export default function StudioDashboard() {
     }
   };
 
-  // ==========================================
-  // PHASE 3: RENDER GPU (COSTS 1 TOKEN)
-  // ==========================================
   const handleRenderImage = async () => {
     if (!optimizedPrompt.trim()) return;
     
@@ -151,18 +129,13 @@ export default function StudioDashboard() {
     }
     
     try {
-      // 1. Kickoff the background worker (Returns instantly in ~100ms)
       const res = await fetch(`${API_BASE}/render-image`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${jwtToken}`
         },
-        body: JSON.stringify({ 
-          theme: theme, 
-          lore: lore, 
-          optimized_prompt: optimizedPrompt 
-        }),
+        body: JSON.stringify({ theme, lore, optimized_prompt: optimizedPrompt }),
       });
 
       if (!res.ok) {
@@ -173,345 +146,251 @@ export default function StudioDashboard() {
       const queueData = await res.json();
       const jobId = queueData.generation_id;
 
-      // 2. Start Polling the background task every 3 seconds
+      setLoadingMessage("Warming serverless neural engine... (Cold starts take ~60s)");
+      
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await fetch(`${API_BASE}/render-status/${jobId}`, {
             headers: { 'Authorization': `Bearer ${jwtToken}` }
           });
           
-          if (!statusRes.ok) return; // Ignore slight network hiccups and keep trying
+          if (!statusRes.ok) return; 
           const job = await statusRes.json();
 
-          // SCENARIO A: The GPU finished successfully!
           if (job.status === 'completed') {
             clearInterval(pollInterval);
             
             const newEntry: CharacterData = {
-              id: jobId, 
+              id: jobId,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               theme,
               lore,
               optimized_prompt: optimizedPrompt,
-              images: [job.image_base64]
+              images: [job.image_base64] 
             };
             
             setCharacterData(newEntry);
             
+            // Persist to history for the future /creations page
             const updatedHistory = [newEntry, ...history].slice(0, 15);
             setHistory(updatedHistory);
             localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
-            
+
             setPhase(4);
             
             if (user) {
               const { data: profileData } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
               if (profileData) setTokens(profileData.tokens);
             }
-
+            
             setGpuStatus('Active');
             gpuTimerRef.current = setTimeout(() => { setGpuStatus('Standby'); }, 5 * 60 * 1000);
             
             setLoading(false);
-          }
-          
-          // SCENARIO B: The GPU crashed (e.g. CUDA Out of Memory)
-          else if (job.status === 'failed') {
+            
+          } else if (job.status === 'failed') {
             clearInterval(pollInterval);
-            setError("The GPU encountered a critical error during execution. Your token was not deducted.");
+            setError("The GPU encountered a critical error. Your token was not deducted.");
             setGpuStatus('Standby');
             setLoading(false);
+          } else {
+            setLoadingMessage(prev => prev.includes("Warming") ? "Executing Tensor K-Sampler math..." : "Refining final details...");
           }
-          
-          // SCENARIO C: 'processing' -> Do nothing, the loop will run again in 3 seconds.
-
         } catch (pollErr) {
-          console.error("Polling step slipped, retrying...", pollErr);
+          console.error("Polling slipped, retrying...", pollErr);
         }
-      }, 3000); // 3000ms = 3 seconds
+      }, 3000);
 
     } catch (err: any) {
-      // This only catches errors if the INITIAL queue request fails
       setError(err.message || "Pipeline orchestration severed.");
       setGpuStatus('Standby');
       setLoading(false); 
     }
   };
 
-  if (!mounted) return null;
+  const handleDownload = () => {
+    if (!characterData?.images?.[0]) return;
+    const a = document.createElement('a');
+    // Ensure base64 prefix is attached for downloading
+    a.href = `data:image/png;base64,${characterData.images[0]}`;
+    a.download = `flufforia-asset-${characterData.id}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
+  const startOver = () => {
+    setTheme('');
+    setLore('');
+    setOptimizedPrompt('');
+    setCharacterData(null);
+    setPhase(1);
+    setError(null);
+  };
+
+  // ==========================================
+  // UI RENDER
+  // ==========================================
+  
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 font-sans antialiased">
-      <main className="max-w-[1600px] mx-auto p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+    <div className="min-h-[calc(100vh-5rem)] bg-[#FFFAF0] flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)]">
+      
+      {/* Header Info (Tokens & GPU) */}
+      <div className="w-full max-w-3xl flex justify-end gap-3 mb-4 animate-fade-in">
+         {tokens !== null && (
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white border border-pink-100 text-pink-500 shadow-sm">
+            <Sparkles size={14} /> {tokens} Tokens
+          </span>
+        )}
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white border border-pink-100 text-zinc-500 shadow-sm">
+          <Cpu size={14} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-400'} />
+          GPU: {gpuStatus}
+        </span>
+      </div>
+
+      {/* THE MORPHING CARD */}
+      <div className={`
+        bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-pink-100 overflow-hidden relative transition-all duration-700 ease-in-out
+        ${phase === 1 ? 'max-w-xl w-full' : phase === 4 ? 'max-w-3xl w-full' : 'max-w-2xl w-full'}
+      `}>
         
-        {/* COLUMN 1: History Sidebar */}
-        <section className="xl:col-span-3 space-y-4">
-          <div className="flex items-center justify-between text-zinc-400">
-            <h2 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-              <History size={14} /> Workspace History
-            </h2>
-            {history.length > 0 && (
-              <button onClick={clearHistory} className="hover:text-red-400 transition-colors">
-                <Trash2 size={14} />
-              </button>
-            )}
+        {/* PROGRESS BAR (Hidden in Phase 4) */}
+        {phase < 4 && (
+          <div className="h-1.5 w-full bg-pink-50">
+            <div 
+              className="h-full bg-pink-300 transition-all duration-500 ease-out"
+              style={{ width: `${(phase / 4) * 100}%` }}
+            />
           </div>
+        )}
+
+        <div className="p-8 md:p-10">
           
-          <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-150px)] pr-2">
-            {history.length === 0 ? (
-              <p className="text-xs text-zinc-600 border border-dashed border-zinc-800 p-4 rounded-lg text-center">No past generations found.</p>
-            ) : (
-              history.map((item) => (
-                <div 
-                  key={item.id} 
-                  onClick={() => {
-                    setCharacterData(item);
-                    setTheme(item.theme);
-                    setLore(item.lore);
-                    setOptimizedPrompt(item.optimized_prompt);
-                    setPhase(4);
-                  }}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${characterData?.id === item.id ? 'bg-zinc-800/80 border-zinc-700' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50'}`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-medium text-zinc-300 line-clamp-1">{item.theme}</span>
-                    <span className="text-[10px] text-zinc-500">{item.timestamp}</span>
-                  </div>
-                  <div className="flex gap-2 h-12">
-                    {item.images.slice(0,1).map((img, idx) => (
-                      <div key={idx} className="h-full aspect-square bg-zinc-950 rounded border border-zinc-800 overflow-hidden">
-                         <img src={`data:image/png;base64,${img}`} className="w-full h-full object-cover opacity-80" alt="thumbnail" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* COLUMN 2: Controller & Editing Wizard */}
-        <section className="xl:col-span-4 space-y-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl flex flex-col h-full min-h-[500px]">
-            
-            {/* Header: Token & GPU Status */}
-            <div className="flex items-center justify-between mb-6 border-b border-zinc-800 pb-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Director Node</h2>
-              <div className="flex items-center gap-2">
-                {tokens !== null && (
-                  <span className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border ${
-                    tokens > 0 ? 'bg-zinc-950 border-green-900/50 text-green-500' : 'bg-red-950/30 border-red-900/50 text-red-500'
-                  }`}>
-                    <Coins size={12} /> {tokens} Left
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5 bg-zinc-950 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest border border-zinc-800">
-                  <Cpu size={12} className={gpuStatus === 'Active' ? 'text-green-500' : gpuStatus === 'Waking' ? 'text-amber-500 animate-pulse' : 'text-zinc-600'} />
-                  {gpuStatus}
-                </span>
-              </div>
-            </div>
-
-            {/* ERROR DISPLAY */}
-            {error && (
-              <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-3 flex gap-3 text-red-400 text-xs mb-4">
-                <AlertCircle size={16} className="shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {/* WIZARD CONTENT */}
-            <div className="flex-1 flex flex-col">
-              
-              {/* PHASE 1: IDEATION */}
-              {phase === 1 && (
-                <form onSubmit={handleDraftLore} className="space-y-4 h-full flex flex-col justify-center">
-                  <div className="text-center mb-6">
-                    <div className="mx-auto h-12 w-12 rounded-full border border-zinc-800 bg-zinc-950 flex items-center justify-center text-green-500 mb-4">
-                      <Sparkles size={20} />
-                    </div>
-                    <h3 className="text-lg font-medium text-zinc-100">Initialize Concept</h3>
-                    <p className="text-xs text-zinc-500 mt-1">Enter a brief theme to generate the local lore.</p>
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      value={theme}
-                      onChange={(e) => setTheme(e.target.value)}
-                      placeholder="e.g., Cyberpunk rogue samurai"
-                      disabled={loading}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-4 text-sm focus:outline-none focus:border-green-500 transition-colors disabled:opacity-50 text-zinc-100"
-                    />
-                  </div>
-                  <button type="submit" disabled={loading} className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
-                    {loading ? 'Drafting Lore...' : 'Draft Character Lore (Free)'} <ArrowRight size={16}/>
-                  </button>
-                </form>
-              )}
-
-              {/* PHASE 2: LORE REVIEW */}
-              {phase === 2 && (
-                <div className="space-y-4 h-full flex flex-col">
-                  <div className="flex items-center gap-2 text-green-500 mb-2">
-                    <BookOpen size={16} /> <span className="text-sm font-semibold uppercase tracking-wider">Edit Lore</span>
-                  </div>
-                  <p className="text-xs text-zinc-400">Review and adjust the AI-generated backstory. This will strictly inform the final visual tags.</p>
-                  <textarea
-                    value={lore}
-                    onChange={(e) => setLore(e.target.value)}
-                    disabled={loading}
-                    className="w-full flex-1 min-h-[200px] bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm focus:outline-none focus:border-green-500 transition-colors disabled:opacity-50 text-zinc-300 custom-scrollbar resize-none"
-                  />
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => setPhase(1)} disabled={loading} className="px-4 py-3 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 rounded-lg text-sm text-zinc-400 transition-colors">
-                      Back
-                    </button>
-                    <button onClick={handleOptimizeTags} disabled={loading} className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
-                      {loading ? 'Optimizing...' : 'Generate Cloud Tags (Free)'} <ArrowRight size={16}/>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* PHASE 3: TAG REVIEW */}
-              {phase === 3 && (
-                <div className="space-y-4 h-full flex flex-col">
-                  <div className="flex items-center gap-2 text-green-500 mb-2">
-                    <Terminal size={16} /> <span className="text-sm font-semibold uppercase tracking-wider">Edit Tags</span>
-                  </div>
-                  <p className="text-xs text-zinc-400">These are the precise ComfyUI instructions. Add or remove tags to force specific visual traits.</p>
-                  <textarea
-                    value={optimizedPrompt}
-                    onChange={(e) => setOptimizedPrompt(e.target.value)}
-                    disabled={loading}
-                    className="w-full flex-1 min-h-[200px] bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm focus:outline-none focus:border-green-500 transition-colors disabled:opacity-50 text-zinc-300 font-mono custom-scrollbar resize-none leading-relaxed"
-                  />
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => setPhase(2)} disabled={loading} className="px-4 py-3 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 rounded-lg text-sm text-zinc-400 transition-colors">
-                      Back
-                    </button>
-                    <button onClick={handleRenderImage} disabled={loading || (tokens !== null && tokens <= 0)} className="flex-1 bg-green-500 hover:bg-green-600 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                      {loading ? 'Initializing GPU...' : 'Render Image (1 Token)'} <Cpu size={16}/>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* PHASE 4: RESULT ACTIONS */}
-              {phase === 4 && (
-                <div className="space-y-6 h-full flex flex-col">
-                  {characterData?.images && characterData.images.length > 0 ? (
-                    <div className="flex-1 flex flex-col space-y-6 overflow-hidden">
-                      {/* Success Header */}
-                      <div className="flex items-center gap-4 bg-green-950/20 border border-green-900/50 rounded-lg p-4 shrink-0">
-                        <div className="h-10 w-10 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 shrink-0">
-                          <CheckCircle2 size={20} />
-                        </div>
-                        <div className="text-left">
-                          <h3 className="text-sm font-bold text-green-500">Asset Rendered Successfully</h3>
-                          <p className="text-xs text-zinc-400 mt-0.5">Execution complete. Saved to local history.</p>
-                        </div>
-                      </div>
-
-                      {/* Read-Only Final Specs */}
-                      <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2 pb-2">
-                        {/* Initial Concept */}
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Initial Concept</span>
-                          <div className="text-sm text-zinc-200 font-medium bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
-                            {theme}
-                          </div>
-                        </div>
-
-                        {/* System Lore */}
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block flex items-center gap-1.5">
-                            <BookOpen size={12}/> System Lore
-                          </span>
-                          <div className="text-xs text-zinc-400 leading-relaxed bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
-                            {lore}
-                          </div>
-                        </div>
-
-                        {/* Cloud Tags */}
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block flex items-center gap-1.5">
-                            <Terminal size={12}/> Cloud Tags
-                          </span>
-                          <div className="text-xs text-zinc-500 font-mono leading-relaxed break-words bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 shadow-inner">
-                            {optimizedPrompt}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col justify-center text-center">
-                      <div className="mx-auto h-16 w-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-4">
-                        <AlertCircle size={32} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-zinc-100">Render Failed</h3>
-                        <p className="text-sm text-zinc-400 mt-2">The GPU encountered a critical error. Your token was not deducted.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Restart Button */}
-                  <div className="pt-2 mt-auto shrink-0 border-t border-zinc-800/50 pt-4">
-                    <button onClick={startOver} className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold text-sm py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
-                      <RefreshCcw size={16} /> Draft New Concept
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* COLUMN 3: Output Display */}
-        <section className="xl:col-span-5">
-          {characterData && phase === 4 ? (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4 group shadow-lg">
-                <div className="flex justify-between items-center text-xs uppercase tracking-wider text-zinc-400 font-medium px-1">
-                  <span className="text-green-500 font-bold flex items-center gap-2"><ImageIcon size={14}/> Raw HD Render</span>
-                  <button 
-                    onClick={() => downloadImage(characterData.images[0], `${characterData.theme.replace(/\s+/g, '_')}_hd.png`)}
-                    className="text-zinc-500 hover:text-green-400 transition-colors flex items-center gap-1 bg-zinc-950 px-3 py-1.5 rounded-md border border-zinc-800 hover:border-green-900/50"
-                  >
-                    <Download size={14} /> Export Asset
-                  </button>
-                </div>
-                
-                <div className="aspect-square w-full max-w-2xl mx-auto bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 flex items-center justify-center relative shadow-inner">
-                  <img src={`data:image/png;base64,${characterData.images[0]}`} alt="Raw High Res" className="w-full h-full object-contain p-2" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full min-h-[500px] border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center text-center p-8 bg-zinc-900/20">
-              <div className="h-12 w-12 rounded-full border border-zinc-800 bg-zinc-900 flex items-center justify-center text-zinc-600 mb-4 shadow-sm">
-                <ImageIcon size={20} />
-              </div>
-              <h3 className="text-sm font-medium text-zinc-400 mb-1">Awaiting Render Execution</h3>
-              <p className="text-xs text-zinc-600 max-w-xs leading-relaxed">
-                Complete the ideation phase and optimize your cloud tags. The asset viewer will initialize once Modal returns the payload.
-              </p>
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-500 rounded-2xl flex items-center gap-3 text-sm font-medium">
+              <AlertCircle size={18} /> {error}
             </div>
           )}
-        </section>
-      </main>
-    </div>
-  );
-}
 
-// Custom icon import for the placeholder
-function ImageIcon({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-      <polyline points="21 15 16 10 5 21"></polyline>
-    </svg>
+          {/* PHASE 1: CONCEPT INPUT */}
+          {phase === 1 && (
+            <form onSubmit={handleDraftLore} className="flex flex-col items-center text-center space-y-6 animate-fade-in">
+              <div className="h-16 w-16 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center mb-2 shadow-inner">
+                <Sparkles size={32} />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-zinc-800" style={{ fontFamily: '"Fredoka", sans-serif' }}>Draft a Concept</h2>
+                <p className="text-zinc-500 mt-2 text-sm">Describe the character you want to bring to life. Keep it simple!</p>
+              </div>
+              
+              <textarea
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                placeholder="e.g. A cute witch with an oversized hat..."
+                className="w-full h-32 bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 text-zinc-700 focus:outline-none focus:border-pink-300 focus:bg-white transition-colors resize-none placeholder:text-zinc-400"
+              />
+              
+              <button 
+                type="submit"
+                disabled={!theme.trim() || loading}
+                className="w-full bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:shadow-[0_2px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+              >
+                {loading ? <Loader2 size={20} className="animate-spin" /> : <Wand2 size={20} />}
+                {loading ? 'Drafting Magic...' : 'Generate Lore (Free)'}
+              </button>
+            </form>
+          )}
+
+          {/* PHASE 2 & 3: LORE & TAG REFINEMENT */}
+          {(phase === 2 || phase === 3) && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                <h2 className="text-2xl font-bold text-zinc-800 flex items-center gap-2" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                  {phase === 2 ? <><BookOpen size={24} className="text-pink-400"/> System Lore</> : <><Terminal size={24} className="text-pink-400"/> Cloud Tags</>}
+                </h2>
+                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 bg-pink-50 px-3 py-1 rounded-full">
+                  Step {phase} of 3
+                </span>
+              </div>
+              
+              <p className="text-sm text-zinc-500">
+                {phase === 2 ? "Review and adjust the AI-generated backstory." : "These are the precise ComfyUI instructions. Adjust if needed."}
+              </p>
+
+              <div className="bg-zinc-50 rounded-2xl p-2 border border-zinc-100 shadow-inner">
+                <textarea
+                    value={phase === 2 ? lore : optimizedPrompt}
+                    onChange={(e) => phase === 2 ? setLore(e.target.value) : setOptimizedPrompt(e.target.value)}
+                    disabled={loading}
+                    className={`w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 custom-scrollbar resize-none ${phase === 3 ? 'font-mono' : ''}`}
+                  />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setPhase(phase - 1)} 
+                  disabled={loading}
+                  className="px-6 py-4 rounded-2xl font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button 
+                  onClick={phase === 2 ? handleOptimizeTags : handleRenderImage}
+                  disabled={loading || (phase === 3 && tokens !== null && tokens <= 0)}
+                  className="flex-1 bg-pink-400 hover:bg-pink-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]"
+                >
+                  {loading ? (
+                    <><Loader2 size={18} className="animate-spin" /> {loadingMessage || 'Processing...'}</>
+                  ) : (
+                    <>{phase === 2 ? 'Generate Tags (Free)' : 'Render Asset (1 Token)'} <ArrowRight size={18} /></>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* PHASE 4: FINAL SHOWCASE */}
+          {phase === 4 && characterData?.images?.[0] && (
+            <div className="animate-fade-in -m-8 md:-m-10 relative group">
+              
+              <Link 
+                href="/creations" 
+                className="absolute top-6 right-6 z-10 bg-white/90 backdrop-blur hover:bg-white text-zinc-700 font-semibold px-4 py-2 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm opacity-90 hover:opacity-100 transform hover:scale-105"
+              >
+                <ExternalLink size={16} className="text-pink-500" />
+                View Details
+              </Link>
+
+              <div className="w-full aspect-square bg-zinc-50 relative border-b border-pink-100">
+                <img 
+                  src={`data:image/png;base64,${characterData.images[0]}`} 
+                  alt="Generated Asset" 
+                  className="w-full h-full object-contain p-4"
+                />
+              </div>
+
+              <div className="p-6 md:p-8 bg-white flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={startOver} 
+                  className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={18} />
+                  Draft New Concept
+                </button>
+                <button 
+                  onClick={handleDownload} 
+                  className="flex-1 bg-pink-400 hover:bg-pink-500 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-[0_4px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px] flex items-center justify-center gap-2"
+                >
+                  <Download size={18} />
+                  Download Asset
+                </button>
+              </div>
+              
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
   );
 }
