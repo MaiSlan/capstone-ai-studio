@@ -80,11 +80,12 @@ export default function Navbar() {
     <div className="fixed top-6 left-0 right-0 z-50 flex justify-center w-full px-4 pointer-events-none">
       <nav className="pointer-events-auto w-full max-w-5xl bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border border-pink-100 dark:border-purple-500/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] rounded-full px-6 h-16 flex items-center justify-between transition-all duration-300">
         
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <div className="h-8 w-8 rounded-xl bg-pink-100 dark:bg-purple-900/50 flex items-center justify-center text-pink-500 dark:text-purple-400 shadow-sm">
+        {/* BRANDING */}
+        <Link href={user ? "/studio" : "/"} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <div className="h-8 w-8 rounded-xl bg-pink-100 dark:bg-purple-900/50 flex items-center justify-center text-pink-500 dark:text-purple-400 shadow-sm transition-colors">
             <Sparkles size={16} />
           </div>
-          <span className="font-bold text-lg text-pink-500 dark:text-purple-300 tracking-wide" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+          <span className="font-bold text-lg text-pink-500 dark:text-purple-300 tracking-wide transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
             Flufforia
           </span>
         </Link>
