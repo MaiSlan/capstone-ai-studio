@@ -103,7 +103,8 @@ export default function Navbar() {
               </div>
             )}
           </div>
-
+          
+          <Link href="/tools/bg-remove" className="text-zinc-500 dark:text-zinc-400 hover:text-pink-400 dark:hover:text-purple-300 transition-colors">Tools</Link>
           <Link href="/creations" className="text-zinc-500 dark:text-zinc-400 hover:text-pink-400 dark:hover:text-purple-300 transition-colors">My Creations</Link>
           <Link href="/studio" className="text-zinc-500 dark:text-zinc-400 hover:text-pink-400 dark:hover:text-purple-300 transition-colors">Studio</Link>
 
