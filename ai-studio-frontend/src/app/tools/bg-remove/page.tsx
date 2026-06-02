@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import removeBackground from '@imgly/background-removal';
+import { removeBackground } from '@imgly/background-removal';
 import { Eraser, UploadCloud, Sparkles, Download, X, Loader2, ImagePlus } from 'lucide-react';
 import Link from 'next/link';
 
