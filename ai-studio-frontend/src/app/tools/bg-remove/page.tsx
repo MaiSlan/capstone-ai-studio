@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
-const MODAL_BG_URL = "https://maislan-ai-studio--flufforia-bg-engine-fastapi-app.modal.run";
-
 export default function BackgroundRemover() {
   const router = useRouter();
   const supabase = createClient();
 
   const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [tokens, setTokens] = useState<number | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -27,6 +26,11 @@ export default function BackgroundRemover() {
         router.replace('/auth');
         return;
       }
+      
+      // Fetch user tokens for the UI
+      const { data: profile } = await supabase.from('profiles').select('tokens').eq('id', user.id).single();
+      if (profile) setTokens(profile.tokens);
+      
       setIsAuthenticating(false);
     };
     checkAuth();
@@ -56,30 +60,41 @@ export default function BackgroundRemover() {
 
   const handleRemoveBackground = async () => {
     if (!imageFile) return;
+    if (tokens !== null && tokens <= 0) {
+      setError("Insufficient tokens to use the Magic Eraser.");
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
 
     try {
-      // Convert the image to raw binary data
-      const arrayBuffer = await imageFile.arrayBuffer();
+      // 1. Pack the image into a standard Web Form
+      const formData = new FormData();
+      formData.append('image', imageFile);
       
-      // Send the binary data directly to your dedicated Modal microservice
-      const res = await fetch(MODAL_BG_URL, {
+      // 2. Send to our secure Next.js API route instead of Modal directly
+      const res = await fetch('/callback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: arrayBuffer
+        body: formData
       });
 
-      if (!res.ok) throw new Error("Cloud Vision engine failed.");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "The Engine encountered an issue removing the background.");
+      }
 
-      // Receive the transparent PNG binary and render it
+      // 3. Receive the transparent image
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setResultUrl(url);
 
-    } catch (err) {
+      // 4. Visually update tokens so the user doesn't have to refresh
+      setTokens(prev => prev !== null ? prev - 1 : null);
+
+    } catch (err: any) {
       console.error(err);
-      setError("The Engine encountered an issue removing the background. Try another image.");
+      setError(err.message);
     } finally {
       setIsProcessing(false);
     }
@@ -121,8 +136,17 @@ export default function BackgroundRemover() {
   }
 
   return (
-    <div className="min-h-screen pt-32 pb-20 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
+    <div className="min-h-screen pt-24 pb-20 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       
+      {/* Header Info (Tokens) */}
+      <div className="w-full max-w-2xl flex justify-end gap-3 mb-4 animate-fade-in">
+         {tokens !== null && (
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-widest bg-white dark:bg-zinc-900 border border-pink-100 dark:border-purple-500/30 text-pink-500 dark:text-purple-400 shadow-sm transition-colors">
+            <Sparkles size={14} /> {tokens} Tokens
+          </span>
+        )}
+      </div>
+
       <div className="text-center mb-10 animate-fade-in">
         <div className="mx-auto h-16 w-16 rounded-full bg-pink-100 dark:bg-purple-900/50 text-pink-500 dark:text-purple-400 flex items-center justify-center mb-4 shadow-sm transform -rotate-3 transition-colors">
           <Eraser size={32} />
@@ -136,7 +160,6 @@ export default function BackgroundRemover() {
       </div>
 
       <div className="w-full max-w-2xl bg-white dark:bg-zinc-900/90 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] border border-pink-100 dark:border-purple-500/30 overflow-hidden transition-all duration-700">
-        
         <div className="p-8 md:p-10">
           
           {error && (
@@ -188,10 +211,10 @@ export default function BackgroundRemover() {
                 {!resultUrl ? (
                   <button 
                     onClick={handleRemoveBackground}
-                    disabled={isProcessing}
+                    disabled={isProcessing || (tokens !== null && tokens <= 0)}
                     className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]"
                   >
-                    {isProcessing ? 'Working...' : 'Remove Background'}
+                    {isProcessing ? 'Working...' : 'Remove Background (1 Token)'}
                     {!isProcessing && <Sparkles size={18} />}
                   </button>
                 ) : (

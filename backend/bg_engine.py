@@ -5,10 +5,22 @@ from fastapi.middleware.cors import CORSMiddleware
 # 1. Define the isolated Modal environment
 app = modal.App("flufforia-bg-engine")
 
-# 2. Install the rembg library and FastAPI
-image = modal.Image.debian_slim().pip_install("rembg[cli]", "pillow", "fastapi")
+# 2. Pre-bake the model into the container so it never downloads at runtime
+MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-anime.onnx"
 
-# 3. Create a FastAPI router to handle CORS so your Next.js app can talk to it
+image = (
+    modal.Image.debian_slim()
+    .apt_install("curl") # <--- THE FIX: Install curl first
+    .pip_install("rembg[cpu]", "onnxruntime", "pillow", "fastapi")
+    .run_commands(
+        # Create the exact hidden directory rembg looks for
+        "mkdir -p /root/.u2net",
+        # Download the anime model directly into the image during the build
+        f"curl -L -o /root/.u2net/isnet-anime.onnx {MODEL_URL}"
+    )
+)
+
+# 3. Create a FastAPI router
 web_app = FastAPI()
 web_app.add_middleware(
     CORSMiddleware,
@@ -23,7 +35,7 @@ async def remove_background(request: Request):
     
     image_bytes = await request.body()
     
-    # 4. Load the holy grail model for 2D character art
+    # 4. This will now load instantly from the local SSD
     session = new_session("isnet-anime")
     
     # 5. Execute the tensor math
