@@ -73,8 +73,8 @@ export default function BackgroundRemover() {
       const formData = new FormData();
       formData.append('image', imageFile);
       
-      // 2. Send to our secure Next.js API route instead of Modal directly
-      const res = await fetch('/callback', {
+      // 2. Send to our secure Next.js API route
+      const res = await fetch('/tools/bg-remove/callback', {
         method: 'POST',
         body: formData
       });
