@@ -4,14 +4,33 @@ import React, { useState, useRef, useEffect } from 'react';
 import { removeBackground } from '@imgly/background-removal';
 import { Eraser, UploadCloud, Sparkles, Download, X, Loader2, ImagePlus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
 
 export default function BackgroundRemover() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 1. Instant Route Guard (Locking the tool to signed-in users)
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        router.replace('/auth');
+        return;
+      }
+      setIsAuthenticating(false);
+    };
+    checkAuth();
+  }, [router, supabase]);
 
   // Clean up object URLs to prevent memory leaks
   useEffect(() => {
@@ -42,7 +61,18 @@ export default function BackgroundRemover() {
     setError(null);
 
     try {
-      const imageBlob = await removeBackground(imageFile);
+      // 2. UPGRADED AI CONFIGURATION
+      // We force the engine to use the "medium" model (or "large") for much better edge 
+      // detection on flat anime/chibi colors, rather than the default "small" model.
+      const config = {
+        model: "medium", // You can change this to "large" if you want even better quality!
+        output: {
+          format: "image/png",
+          quality: 1.0
+        }
+      };
+
+      const imageBlob = await removeBackground(imageFile, config as any);
       const url = URL.createObjectURL(imageBlob);
       setResultUrl(url);
     } catch (err) {
@@ -73,7 +103,6 @@ export default function BackgroundRemover() {
     document.body.removeChild(a);
   };
 
-  // Checkerboard pattern to show transparency clearly
   const checkerboardBg = {
     backgroundImage: `
       linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%), 
@@ -85,10 +114,14 @@ export default function BackgroundRemover() {
     backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
   };
 
+  // Prevent UI flash while verifying user
+  if (isAuthenticating) {
+    return <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700"></div>;
+  }
+
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       
-      {/* Header */}
       <div className="text-center mb-10 animate-fade-in">
         <div className="mx-auto h-16 w-16 rounded-full bg-pink-100 dark:bg-purple-900/50 text-pink-500 dark:text-purple-400 flex items-center justify-center mb-4 shadow-sm transform -rotate-3 transition-colors">
           <Eraser size={32} />
@@ -101,7 +134,6 @@ export default function BackgroundRemover() {
         </p>
       </div>
 
-      {/* Main Card */}
       <div className="w-full max-w-2xl bg-white dark:bg-zinc-900/90 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] border border-pink-100 dark:border-purple-500/30 overflow-hidden transition-all duration-700">
         
         <div className="p-8 md:p-10">
@@ -113,7 +145,6 @@ export default function BackgroundRemover() {
           )}
 
           {!previewUrl ? (
-            /* UPLOAD ZONE */
             <div 
               onClick={() => fileInputRef.current?.click()}
               className="w-full h-80 border-2 border-dashed border-pink-200 dark:border-purple-500/30 rounded-3xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-pink-50 dark:hover:bg-purple-900/10 transition-colors group"
@@ -125,7 +156,6 @@ export default function BackgroundRemover() {
               <p className="text-sm text-zinc-500 dark:text-zinc-400">or click to browse from your device</p>
             </div>
           ) : (
-            /* PREVIEW & RESULT ZONE */
             <div className="space-y-6 animate-fade-in">
               <div className="relative w-full aspect-square md:aspect-video rounded-3xl overflow-hidden border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950" style={checkerboardBg}>
                 
@@ -153,7 +183,6 @@ export default function BackgroundRemover() {
                 </button>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-4">
                 {!resultUrl ? (
                   <button 
@@ -184,7 +213,6 @@ export default function BackgroundRemover() {
             </div>
           )}
 
-          {/* Hidden File Input */}
           <input 
             type="file" 
             ref={fileInputRef} 
