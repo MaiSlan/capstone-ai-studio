@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
-// 🚨 PASTE YOUR MODAL URL HERE 🚨
-const MODAL_BG_URL = "https://your-name--flufforia-bg-engine-fastapi-app.modal.run";
+const MODAL_BG_URL = "https://maislan-ai-studio--flufforia-bg-engine-fastapi-app.modal.run";
 
 export default function BackgroundRemover() {
   const router = useRouter();
