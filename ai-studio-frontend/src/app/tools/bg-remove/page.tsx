@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { removeBackground } from '@imgly/background-removal';
 import { Eraser, UploadCloud, Sparkles, Download, X, Loader2, ImagePlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+
+// 🚨 PASTE YOUR MODAL URL HERE 🚨
+const MODAL_BG_URL = "https://your-name--flufforia-bg-engine-fastapi-app.modal.run";
 
 export default function BackgroundRemover() {
   const router = useRouter();
@@ -19,7 +21,6 @@ export default function BackgroundRemover() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Instant Route Guard (Locking the tool to signed-in users)
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -32,7 +33,6 @@ export default function BackgroundRemover() {
     checkAuth();
   }, [router, supabase]);
 
-  // Clean up object URLs to prevent memory leaks
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -61,23 +61,26 @@ export default function BackgroundRemover() {
     setError(null);
 
     try {
-      // 2. UPGRADED AI CONFIGURATION
-      // We force the engine to use the "medium" model (or "large") for much better edge 
-      // detection on flat anime/chibi colors, rather than the default "small" model.
-      const config = {
-        model: "medium", // You can change this to "large" if you want even better quality!
-        output: {
-          format: "image/png",
-          quality: 1.0
-        }
-      };
+      // Convert the image to raw binary data
+      const arrayBuffer = await imageFile.arrayBuffer();
+      
+      // Send the binary data directly to your dedicated Modal microservice
+      const res = await fetch(MODAL_BG_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: arrayBuffer
+      });
 
-      const imageBlob = await removeBackground(imageFile, config as any);
-      const url = URL.createObjectURL(imageBlob);
+      if (!res.ok) throw new Error("Cloud Vision engine failed.");
+
+      // Receive the transparent PNG binary and render it
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       setResultUrl(url);
+
     } catch (err) {
       console.error(err);
-      setError("The AI encountered an issue removing the background. Try another image.");
+      setError("The Engine encountered an issue removing the background. Try another image.");
     } finally {
       setIsProcessing(false);
     }
@@ -114,7 +117,6 @@ export default function BackgroundRemover() {
     backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
   };
 
-  // Prevent UI flash while verifying user
   if (isAuthenticating) {
     return <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700"></div>;
   }
@@ -130,7 +132,7 @@ export default function BackgroundRemover() {
           Magic Eraser
         </h1>
         <p className="text-zinc-500 dark:text-zinc-400 max-w-md mx-auto transition-colors">
-          Instantly remove backgrounds from your generated assets. Runs 100% locally in your browser for total privacy.
+          Instantly remove backgrounds from your generated assets. Uses dedicated Anime AI models for flawless cutouts.
         </p>
       </div>
 
