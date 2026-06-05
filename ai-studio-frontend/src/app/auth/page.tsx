@@ -44,10 +44,11 @@ export default function AuthPage() {
         setView('login'); 
 
       } else if (view === 'forgot') {
-        // Send the reset email, and tell the callback to route them to the update page!
+        // We use encodeURIComponent to ensure the link survives the email client and Supabase!
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth/update-password')}`,
         });
+        
         if (resetError) throw resetError;
         setMessage('Password reset link sent! Please check your inbox.');
         setView('login');
