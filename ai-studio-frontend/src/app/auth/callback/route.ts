@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   
   // We want to send them directly into the studio after verification
-  const next = '/studio'
+  const next = searchParams.get('next') || '/studio'
 
   if (code) {
     // FIX: In Next.js 15+, cookies() returns a Promise that must be awaited

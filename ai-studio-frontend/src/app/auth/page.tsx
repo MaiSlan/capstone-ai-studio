@@ -4,13 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Sparkles, ArrowRight, Loader2, AlertCircle, ArrowLeft, KeyRound } from 'lucide-react';
 
 export default function AuthPage() {
   const router = useRouter();
   const supabase = createClient();
   
-  const [isLogin, setIsLogin] = useState(true);
+  // Upgraded from a boolean to support 3 distinct views
+  const [view, setView] = useState<'login' | 'signup' | 'forgot'>('login');
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,28 +31,32 @@ export default function AuthPage() {
     setMessage(null);
 
     try {
-      if (isLogin) {
+      if (view === 'login') {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-        
-        // FIX: Force Next.js to sync the new cookie state globally
         router.refresh();
-        
-        // FIX: Add a tiny micro-delay to ensure the session is written before navigating
-        setTimeout(() => {
-          router.push('/studio');
-        }, 100);
+        setTimeout(() => { router.push('/studio'); }, 100);
 
-      } else {
+      } else if (view === 'signup') {
         const { error: signUpError } = await supabase.auth.signUp({ email, password });
         if (signUpError) throw signUpError;
         setMessage('Registration successful! Please check your email to verify your account.');
-        setIsLogin(true); 
+        setView('login'); 
+
+      } else if (view === 'forgot') {
+        // Send the reset email, and tell the callback to route them to the update page!
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
+        });
+        if (resetError) throw resetError;
+        setMessage('Password reset link sent! Please check your inbox.');
+        setView('login');
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please try again.');
-      setLoading(false); // Only stop loading if there's an error
-    } 
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,7 +70,6 @@ export default function AuthPage() {
       </Link>
 
       <div className="w-full max-w-md animate-fade-in">
-        
         <div className="flex justify-center mb-8">
           <div className="h-16 w-16 rounded-2xl bg-pink-100 dark:bg-purple-900/50 flex items-center justify-center text-pink-500 dark:text-purple-400 shadow-sm transform -rotate-3 transition-colors">
             <Sparkles size={32} />
@@ -75,10 +80,12 @@ export default function AuthPage() {
           
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-              {isLogin ? 'Welcome Back' : 'Join Flufforia'}
+              {view === 'login' ? 'Welcome Back' : view === 'signup' ? 'Join Flufforia' : 'Reset Password'}
             </h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 transition-colors">
-              {isLogin ? 'Sign in to access your magical studio.' : 'Create an account to start drafting characters.'}
+              {view === 'login' ? 'Sign in to access your magical studio.' 
+                : view === 'signup' ? 'Create an account to start drafting characters.'
+                : 'Enter your email to receive a secure reset link.'}
             </p>
           </div>
 
@@ -112,20 +119,34 @@ export default function AuthPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                className="w-full bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl px-4 py-3.5 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-pink-300 dark:focus:border-purple-500 transition-colors disabled:opacity-50"
-                placeholder="••••••••"
-              />
-            </div>
+            {/* Only show password field if they are trying to log in or sign up */}
+            {view !== 'forgot' && (
+              <div>
+                <div className="flex items-center justify-between mb-2 pl-1 pr-1">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 transition-colors">
+                    Password
+                  </label>
+                  {view === 'login' && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setView('forgot'); setError(null); setMessage(null); }}
+                      className="text-xs font-medium text-pink-400 dark:text-purple-400 hover:text-pink-500 dark:hover:text-purple-300 transition-colors"
+                    >
+                      Forgot?
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl px-4 py-3.5 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-pink-300 dark:focus:border-purple-500 transition-colors disabled:opacity-50"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
 
             <button
               type="submit"
@@ -133,21 +154,30 @@ export default function AuthPage() {
               className="w-full mt-2 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]"
             >
               {loading ? (
-                <><Loader2 size={20} className="animate-spin" /> Authenticating...</>
+                <><Loader2 size={20} className="animate-spin" /> Processing...</>
+              ) : view === 'forgot' ? (
+                <>Send Reset Link <KeyRound size={18} /></>
               ) : (
-                <>{isLogin ? 'Enter Studio' : 'Create Account'} <ArrowRight size={20} /></>
+                <>{view === 'login' ? 'Enter Studio' : 'Create Account'} <ArrowRight size={20} /></>
               )}
             </button>
           </form>
 
+          {/* Toggle between Login and Signup */}
           <div className="mt-8 text-center">
             <button
               type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(null); setMessage(null); }}
+              onClick={() => { 
+                setView(view === 'login' ? 'signup' : 'login'); 
+                setError(null); 
+                setMessage(null); 
+              }}
               disabled={loading}
               className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-pink-500 dark:hover:text-purple-400 transition-colors"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {view === 'login' 
+                ? "Don't have an account? Sign up" 
+                : "Already have an account? Sign in"}
             </button>
           </div>
 
