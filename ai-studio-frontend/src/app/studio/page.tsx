@@ -75,9 +75,18 @@ export default function FlufforiaStudio() {
       const data = await res.json();
       
       setLore(data.lore);
-      const parts = data.lore.split('\n\n');
-      setAppearancePart(parts[0] || '');
-      setBackstoryPart(parts.slice(1).join('\n\n') || '');
+      
+      // Clean out markdown headers the AI might have injected
+      const cleanLore = data.lore.replace(/\*\*(Visual Appearance|Character Backstory|Backstory):\*\*/ig, '').trim();
+      
+      // Try double newline first, fallback to single newline
+      let parts = cleanLore.split('\n\n');
+      if (parts.length === 1 && cleanLore.includes('\n')) {
+        parts = cleanLore.split('\n');
+      }
+      
+      setAppearancePart(parts[0]?.trim() || '');
+      setBackstoryPart(parts.slice(1).join('\n\n')?.trim() || '');
       
       setPhase(2);
     } catch (err: any) {
@@ -288,16 +297,6 @@ export default function FlufforiaStudio() {
           </span>
         </div>
 
-        {/* PROGRESS BAR */}
-        {phase < 4 && (
-          <div className="h-1.5 w-full bg-pink-50 dark:bg-zinc-800 transition-colors">
-            <div 
-              className="h-full bg-pink-300 dark:bg-purple-500 transition-all duration-500 ease-out"
-              style={{ width: `${(phase / 4) * 100}%` }}
-            />
-          </div>
-        )}
-
         <div className="p-8 md:p-10">
           
           {error && (
@@ -336,20 +335,19 @@ export default function FlufforiaStudio() {
                 <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
                   <BookOpen size={24} className="text-pink-400 dark:text-purple-400"/> System Lore
                 </h2>
-                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 dark:text-purple-300 bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full transition-colors">Step 2 of 3</span>
               </div>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">Review and adjust the AI-generated backstory and appearance.</p>
-              <div className="space-y-4">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col h-full">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Visual Appearance</label>
-                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
-                    <textarea value={appearancePart} onChange={(e) => setAppearancePart(e.target.value)} disabled={loading} className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
+                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors flex-1">
+                    <textarea value={appearancePart} onChange={(e) => setAppearancePart(e.target.value)} disabled={loading} className="w-full h-full min-h-[150px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
                   </div>
                 </div>
-                <div>
+                <div className="flex flex-col h-full">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Character Backstory</label>
-                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
-                    <textarea value={backstoryPart} onChange={(e) => setBackstoryPart(e.target.value)} disabled={loading} className="w-full h-[120px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
+                  <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors flex-1">
+                    <textarea value={backstoryPart} onChange={(e) => setBackstoryPart(e.target.value)} disabled={loading} className="w-full h-full min-h-[150px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
                   </div>
                 </div>
               </div>
@@ -368,7 +366,6 @@ export default function FlufforiaStudio() {
                 <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
                   <Terminal size={24} className="text-pink-400 dark:text-purple-400"/> Cloud Tags
                 </h2>
-                <span className="text-xs font-bold uppercase tracking-wider text-pink-400 dark:text-purple-300 bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full transition-colors">Step 3 of 3</span>
               </div>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">These are the precise ComfyUI instructions. Adjust if needed.</p>
               <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-2 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
@@ -433,6 +430,18 @@ export default function FlufforiaStudio() {
                 </button>
               </div>
               
+            </div>
+          )}
+
+          {/* BOTTOM PROGRESS DASHES */}
+          {phase < 4 && (
+            <div className="flex justify-center gap-3 mt-10 mb-2">
+              {[1, 2, 3, 4].map((step) => (
+                <div 
+                  key={step} 
+                  className={`h-1.5 w-10 rounded-full transition-colors duration-500 ${phase >= step ? 'bg-pink-400 dark:bg-purple-500' : 'bg-pink-100 dark:bg-zinc-800'}`} 
+                />
+              ))}
             </div>
           )}
 
