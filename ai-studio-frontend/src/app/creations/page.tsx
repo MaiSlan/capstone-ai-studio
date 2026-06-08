@@ -17,11 +17,24 @@ interface CharacterData {
 
 // Helper function to extract a clean name from the lore or theme
 const getCharacterName = (lore: string, theme: string) => {
-  const match = lore.match(/(?:Name|Character):\s*\*?\*?([^\n*]+)/i);
-  if (match) return match[1].trim();
-  const firstLine = lore.split('\n')[0].replace(/[\*#]/g, '').trim();
-  if (firstLine && firstLine.length < 40) return firstLine;
-  return theme; // fallback
+  // 1. Try aggressive regex for "Name:" or "Character:" ignoring markdown bolding
+  const match = lore.match(/\b(?:Name|Character)\s*:\s*\*?\*?([^\n*]+)/i);
+  if (match && match[1].trim()) return match[1].trim();
+  
+  // 2. Check if the first line is acting as a short title (e.g., "# The Crimson Knight")
+  const firstLine = lore.split('\n')[0].trim();
+  const cleanFirstLine = firstLine.replace(/[\*#_]/g, '').trim();
+  if (cleanFirstLine && cleanFirstLine.length < 50 && !cleanFirstLine.toLowerCase().includes('appearance')) {
+    return cleanFirstLine;
+  }
+  
+  // 3. Fallback: Capitalize the first few words of the user's initial prompt
+  if (theme) {
+     const words = theme.split(' ').slice(0, 5).join(' ');
+     return words.charAt(0).toUpperCase() + words.slice(1) + (theme.split(' ').length > 5 ? '...' : '');
+  }
+  
+  return "Unknown Character";
 };
 
 export default function MyCreations() {
