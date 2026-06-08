@@ -220,12 +220,15 @@ export default function MyCreations() {
         )}
       </div>
 
+      {/* REWORKED MODAL OVERLAY: Left/Right Layout */}
       {selectedCreation && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCreation(null)}></div>
           
-          <div className="relative bg-white dark:bg-zinc-900 w-full max-w-5xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-fade-in border border-pink-100 dark:border-purple-500/30 transition-colors">
+          {/* Increased max-w to 6xl to accommodate the side-by-side layout cleanly */}
+          <div className="relative bg-white dark:bg-zinc-900 w-full max-w-6xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-fade-in border border-pink-100 dark:border-purple-500/30 transition-colors">
             
+            {/* Header Area */}
             <div className="flex items-start justify-between p-6 border-b border-pink-50 dark:border-zinc-800 transition-colors">
               <div>
                 <h2 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
@@ -238,51 +241,60 @@ export default function MyCreations() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col items-center custom-scrollbar">
+            {/* Body Area - Left/Right Split */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 custom-scrollbar">
               
-              <div className="w-full max-w-3xl aspect-square md:aspect-video bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-pink-100 dark:border-zinc-800 overflow-hidden shadow-inner transition-colors mb-6 relative" style={checkerboardBg}>
-                <img 
-                  src={`data:image/png;base64,${selectedCreation.images[0]}`} 
-                  alt="Asset Preview" 
-                  className={`w-full h-full object-contain p-2 transition-opacity duration-300 ${removingBgId === selectedCreation.id ? 'opacity-30 blur-sm' : 'opacity-100'}`}
-                />
+              {/* LEFT COLUMN: Large Image & Action Buttons */}
+              <div className="flex flex-col items-center w-full">
+                <div className="w-full aspect-square bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-pink-100 dark:border-zinc-800 overflow-hidden shadow-inner transition-colors mb-6 relative" style={checkerboardBg}>
+                  <img 
+                    src={`data:image/png;base64,${selectedCreation.images[0]}`} 
+                    alt="Asset Preview" 
+                    className={`w-full h-full object-contain p-2 transition-opacity duration-300 ${removingBgId === selectedCreation.id ? 'opacity-30 blur-sm' : 'opacity-100'}`}
+                  />
+                </div>
+
+                <div className="flex w-full gap-4">
+                  <button 
+                    onClick={(e) => handleDownload(e, selectedCreation.images[0], selectedCreation.id)}
+                    className="flex-1 bg-pink-50 dark:bg-purple-900/20 hover:bg-pink-100 dark:hover:bg-purple-900/40 text-pink-600 dark:text-purple-400 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    <Download size={18} /> Download
+                  </button>
+                  <button 
+                    onClick={() => handleInlineBgRemove(selectedCreation.id, selectedCreation.images[0])}
+                    disabled={removingBgId === selectedCreation.id}
+                    className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-[0_2px_0_rgba(244,114,182,0.4)] dark:shadow-[0_2px_0_rgba(147,51,234,0.4)] hover:translate-y-[1px] flex items-center justify-center gap-2 text-sm md:text-base"
+                  >
+                    {removingBgId === selectedCreation.id ? <Loader2 size={18} className="animate-spin" /> : <Eraser size={18} />}
+                    {removingBgId === selectedCreation.id ? 'Processing...' : 'Remove BG'}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-4 w-full max-w-3xl mb-10">
-                <button 
-                  onClick={(e) => handleDownload(e, selectedCreation.images[0], selectedCreation.id)}
-                  className="flex-1 bg-pink-50 dark:bg-purple-900/20 hover:bg-pink-100 dark:hover:bg-purple-900/40 text-pink-600 dark:text-purple-400 font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <Download size={18} /> Download High-Res
-                </button>
-                <button 
-                  onClick={() => handleInlineBgRemove(selectedCreation.id, selectedCreation.images[0])}
-                  disabled={removingBgId === selectedCreation.id}
-                  className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-[0_2px_0_rgba(244,114,182,0.4)] dark:shadow-[0_2px_0_rgba(147,51,234,0.4)] hover:translate-y-[1px] flex items-center justify-center gap-2"
-                >
-                  {removingBgId === selectedCreation.id ? <Loader2 size={18} className="animate-spin" /> : <Eraser size={18} />}
-                  {removingBgId === selectedCreation.id ? 'Processing...' : 'Remove Background'}
-                </button>
-              </div>
-
-              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                <div className="flex flex-col h-full">
+              {/* RIGHT COLUMN: Stacked Text Boxes */}
+              <div className="flex flex-col gap-6 w-full text-left">
+                
+                {/* Appearance Block */}
+                <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors mb-2 block">
-                    {getCharacterName(selectedCreation.lore, selectedCreation.theme)}
+                    {getCharacterName(selectedCreation.lore, selectedCreation.theme)} - Appearance
                   </span>
-                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors flex-1">
-                    {selectedCreation.lore.split('\n\n')[0] || ''}
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors">
+                    {selectedCreation.lore.split('\n\n')[0] || 'No appearance details provided.'}
                   </div>
                 </div>
 
-                <div className="flex flex-col h-full">
+                {/* Backstory Block */}
+                <div className="flex flex-col flex-1">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors mb-2 block">
                     Character Backstory
                   </span>
-                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors flex-1">
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors h-full">
                     {selectedCreation.lore.split('\n\n').slice(1).join('\n\n') || 'No backstory provided.'}
                   </div>
                 </div>
+
               </div>
 
             </div>
