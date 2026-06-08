@@ -32,7 +32,6 @@ export default function MyCreations() {
   const [history, setHistory] = useState<CharacterData[]>([]);
   const [selectedCreation, setSelectedCreation] = useState<CharacterData | null>(null);
   
-  // New States for UI features
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [removingBgId, setRemovingBgId] = useState<string | null>(null);
 
@@ -52,7 +51,6 @@ export default function MyCreations() {
   }, [router, supabase]);
 
   const sortedHistory = [...history].sort((a, b) => {
-    // We assume the array is natively ordered newest-first by localStorage insertion.
     return sortOrder === 'newest' ? 0 : -1;
   });
 
@@ -76,7 +74,6 @@ export default function MyCreations() {
     if (selectedCreation?.id === id) setSelectedCreation(null);
   };
 
-  // The inline Background Remover logic for the Modal
   const handleInlineBgRemove = async (creationId: string, currentBase64: string) => {
     setRemovingBgId(creationId);
     try {
@@ -102,14 +99,12 @@ export default function MyCreations() {
       reader.onloadend = () => {
         const base64data = (reader.result as string).split(',')[1];
         
-        // Update History
         const updatedHistory = history.map(item => 
           item.id === creationId ? { ...item, images: [base64data] } : item
         );
         setHistory(updatedHistory);
         localStorage.setItem('aiStudioHistory', JSON.stringify(updatedHistory));
         
-        // Update Modal view live
         if (selectedCreation && selectedCreation.id === creationId) {
           setSelectedCreation({ ...selectedCreation, images: [base64data] });
         }
@@ -148,7 +143,6 @@ export default function MyCreations() {
           <p className="text-zinc-500 dark:text-zinc-400 transition-colors">Your personal gallery of generated characters and assets.</p>
         </div>
 
-        {/* Filter Toggle */}
         {history.length > 0 && (
           <div className="flex justify-end mb-6">
             <button 
@@ -195,7 +189,6 @@ export default function MyCreations() {
                 </div>
 
                 <div className="p-6 transition-colors flex-1 flex flex-col">
-                  {/* Replaced Theme with Character Name */}
                   <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 line-clamp-1 mb-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
                     {getCharacterName(item.lore, item.theme)}
                   </h3>
@@ -214,32 +207,27 @@ export default function MyCreations() {
         )}
       </div>
 
-      {/* REWORKED MODAL OVERLAY */}
       {selectedCreation && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCreation(null)}></div>
           
-          <div className="relative bg-white dark:bg-zinc-900 w-full max-w-3xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-fade-in border border-pink-100 dark:border-purple-500/30 transition-colors">
+          <div className="relative bg-white dark:bg-zinc-900 w-full max-w-5xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-fade-in border border-pink-100 dark:border-purple-500/30 transition-colors">
             
-            {/* Header Area */}
             <div className="flex items-start justify-between p-6 border-b border-pink-50 dark:border-zinc-800 transition-colors">
               <div>
                 <h2 className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
                   {getCharacterName(selectedCreation.lore, selectedCreation.theme)}
                 </h2>
-                {/* Replaced ID with Initial Concept */}
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 font-medium">Concept: {selectedCreation.theme}</p>
               </div>
-              <button onClick={() => setSelectedCreation(null)} className="h-10 w-10 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors">
+              <button onClick={() => setSelectedCreation(null)} className="h-10 w-10 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors shrink-0">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Body Area - Centered Design */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col items-center custom-scrollbar">
               
-              {/* Centered Large Image */}
-              <div className="w-full max-w-lg aspect-square bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-pink-100 dark:border-zinc-800 overflow-hidden shadow-inner transition-colors mb-6 relative" style={checkerboardBg}>
+              <div className="w-full max-w-3xl aspect-square md:aspect-video bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-pink-100 dark:border-zinc-800 overflow-hidden shadow-inner transition-colors mb-6 relative" style={checkerboardBg}>
                 <img 
                   src={`data:image/png;base64,${selectedCreation.images[0]}`} 
                   alt="Asset Preview" 
@@ -247,8 +235,7 @@ export default function MyCreations() {
                 />
               </div>
 
-              {/* Action Buttons under Image */}
-              <div className="flex flex-wrap items-center justify-center gap-4 w-full max-w-lg mb-10">
+              <div className="flex flex-wrap items-center justify-center gap-4 w-full max-w-3xl mb-10">
                 <button 
                   onClick={(e) => handleDownload(e, selectedCreation.images[0], selectedCreation.id)}
                   className="flex-1 bg-pink-50 dark:bg-purple-900/20 hover:bg-pink-100 dark:hover:bg-purple-900/40 text-pink-600 dark:text-purple-400 font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -265,11 +252,23 @@ export default function MyCreations() {
                 </button>
               </div>
 
-              {/* Backstory below buttons */}
-              <div className="w-full text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors mb-2 block">System Lore & Appearance</span>
-                <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors">
-                  {selectedCreation.lore}
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                <div className="flex flex-col h-full">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors mb-2 block">
+                    {getCharacterName(selectedCreation.lore, selectedCreation.theme)}
+                  </span>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors flex-1">
+                    {selectedCreation.lore.split('\n\n')[0] || ''}
+                  </div>
+                </div>
+
+                <div className="flex flex-col h-full">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors mb-2 block">
+                    Character Backstory
+                  </span>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-inner leading-relaxed whitespace-pre-wrap transition-colors flex-1">
+                    {selectedCreation.lore.split('\n\n').slice(1).join('\n\n') || 'No backstory provided.'}
+                  </div>
                 </div>
               </div>
 
