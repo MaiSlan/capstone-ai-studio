@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Database, Globe, Server, Cpu, Brain, Eraser, ArrowDown, ArrowRight, ArrowLeft } from 'lucide-react';
+import { 
+  Database, Globe, Server, Cpu, Brain, Eraser, 
+  ArrowDown, ShieldCheck, Zap, Layers, Code2, 
+  Workflow, Lock, HardDrive 
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function ArchitecturePage() {
@@ -20,119 +24,216 @@ export default function ArchitecturePage() {
             System Architecture
           </h1>
           <p className="text-lg text-zinc-500 dark:text-zinc-400 transition-colors max-w-2xl mx-auto">
-            A comprehensive overview of the Flufforia cloud orchestration, microservices, and serverless AI pipeline.
+            A comprehensive technical specification of the Flufforia cloud orchestration, microservices, and serverless AI pipeline.
           </p>
-        </div>
-
-        {/* SECTION 1: THE VISUAL DATA FLOW DIAGRAM */}
-        <div className="mb-24">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-xl font-bold uppercase tracking-widest text-pink-400 dark:text-purple-400 transition-colors">Data Flow Topology</h2>
-            <Link href="/architecture/workflow" className="text-sm font-bold text-pink-500 dark:text-purple-400 hover:underline flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 rounded-full shadow-sm border border-pink-100 dark:border-zinc-800 transition-colors">
-              View Tensor Pipeline &rarr;
+          
+          <div className="mt-8 flex justify-center">
+            <Link href="/architecture/workflow" className="text-sm font-bold text-pink-500 dark:text-purple-400 hover:text-pink-600 dark:hover:text-purple-300 flex items-center gap-2 bg-white dark:bg-zinc-900 px-6 py-3 rounded-full shadow-sm border border-pink-100 dark:border-zinc-800 transition-all hover:shadow-md hover:-translate-y-0.5">
+              <Workflow size={16} /> View Low-Level Tensor Pipeline
             </Link>
           </div>
+        </div>
+
+        {/* SECTION 1: THE LAYERED STACK DIAGRAM */}
+        <div className="mb-24">
+          <h2 className="text-xl font-bold uppercase tracking-widest text-pink-400 dark:text-purple-400 mb-8 text-center transition-colors">
+            Layered Topology
+          </h2>
           
-          <div className="bg-white dark:bg-zinc-900/90 border border-pink-100 dark:border-purple-500/30 rounded-[3rem] p-8 md:p-16 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] overflow-x-auto transition-all duration-700">
-            <div className="min-w-[800px] flex flex-col items-center">
+          <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
+            
+            {/* Layer 1: Edge */}
+            <div className="w-full bg-white dark:bg-zinc-900/90 border border-pink-100 dark:border-purple-500/30 rounded-3xl p-6 shadow-sm transition-colors flex flex-col md:flex-row items-center gap-6">
+              <div className="bg-pink-100 dark:bg-purple-900/30 p-4 rounded-2xl text-pink-500 dark:text-purple-400 shrink-0">
+                <Globe size={32} />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-1">Layer 1: The Edge (Vercel)</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">Next.js App Router providing SSR, global CDN caching, and secure API Proxy Routes to mask backend infrastructure.</p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Badge text="React 18" />
+                <Badge text="TailwindCSS" />
+              </div>
+            </div>
+
+            <ArrowDown size={24} className="text-pink-200 dark:text-purple-900/50" />
+
+            {/* Layer 2: State */}
+            <div className="w-full bg-white dark:bg-zinc-900/90 border border-emerald-100 dark:border-emerald-900/30 rounded-3xl p-6 shadow-sm transition-colors flex flex-col md:flex-row items-center gap-6">
+              <div className="bg-emerald-100 dark:bg-emerald-900/30 p-4 rounded-2xl text-emerald-500 dark:text-emerald-400 shrink-0">
+                <Database size={32} />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-1">Layer 2: State & Auth (Supabase)</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">PostgreSQL cluster managing JWT issuance, Row Level Security (RLS), and server-side token ledgers.</p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Badge text="PostgreSQL" />
+                <Badge text="JWT Auth" />
+              </div>
+            </div>
+
+            <ArrowDown size={24} className="text-pink-200 dark:text-purple-900/50" />
+
+            {/* Layer 3: Orchestration */}
+            <div className="w-full bg-white dark:bg-zinc-900/90 border border-blue-100 dark:border-blue-900/30 rounded-3xl p-6 shadow-sm transition-colors flex flex-col md:flex-row items-center gap-6">
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-2xl text-blue-500 dark:text-blue-400 shrink-0">
+                <Server size={32} />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-1">Layer 3: Orchestration (Render)</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">FastAPI Python backend. Handles CORS, payload sanitization, stateful long-polling, and microservice routing.</p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Badge text="FastAPI" />
+                <Badge text="Uvicorn" />
+              </div>
+            </div>
+
+            <ArrowDown size={24} className="text-pink-200 dark:text-purple-900/50" />
+
+            {/* Layer 4: AI Compute Cluster */}
+            <div className="w-full bg-zinc-50 dark:bg-zinc-950 border border-amber-100 dark:border-amber-900/30 rounded-3xl p-6 shadow-inner transition-colors">
+              <h3 className="text-center text-sm font-bold uppercase tracking-widest text-amber-500 mb-6">Layer 4: Serverless AI Compute Cluster</h3>
               
-              {/* Tier 1: Frontend Hub */}
-              <div className="flex flex-col items-center relative z-10">
-                <DiagramNode icon={<Globe size={24} />} title="Next.js Frontend" tech="Vercel Edge" color="pink" />
-                <div className="h-12 w-0.5 bg-zinc-200 dark:bg-zinc-700 my-2"></div>
-              </div>
-
-              {/* Tier 2: The Three Pillars */}
-              <div className="flex w-full justify-center relative">
-                {/* Horizontal connection line */}
-                <div className="absolute top-0 w-2/3 h-0.5 bg-zinc-200 dark:bg-zinc-700 -z-10"></div>
-                
-                <div className="flex justify-between w-4/5">
-                  
-                  {/* Left Path: Database */}
-                  <div className="flex flex-col items-center w-1/3">
-                    <div className="h-8 w-0.5 bg-zinc-200 dark:bg-zinc-700 mb-2"></div>
-                    <DiagramNode icon={<Database size={24} />} title="PostgreSQL" tech="Supabase" color="green" />
-                  </div>
-
-                  {/* Center Path: Orchestrator */}
-                  <div className="flex flex-col items-center w-1/3">
-                    <DiagramNode icon={<Server size={24} />} title="FastAPI Orchestrator" tech="Render Cloud" color="blue" />
-                    <div className="h-12 w-0.5 bg-zinc-200 dark:bg-zinc-700 my-2"></div>
-                  </div>
-
-                  {/* Right Path: Tool Bypass */}
-                  <div className="flex flex-col items-center w-1/3">
-                    <div className="h-8 w-0.5 bg-zinc-200 dark:bg-zinc-700 mb-2"></div>
-                    <DiagramNode icon={<Eraser size={24} />} title="Eraser Microservice" tech="Modal (isnet-anime)" color="purple" />
-                  </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center text-center shadow-sm">
+                  <Brain size={24} className="text-amber-500 mb-2" />
+                  <h4 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">Groq LPU</h4>
+                  <p className="text-xs text-zinc-500 mt-2">Llama-3 70B generating structured lore and ComfyUI tags via ultra-fast inference.</p>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center text-center shadow-sm">
+                  <Cpu size={24} className="text-amber-500 mb-2" />
+                  <h4 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">Modal A10G (Generative)</h4>
+                  <p className="text-xs text-zinc-500 mt-2">Serverless container executing SDXL and dynamic LoRAs via headless ComfyUI.</p>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center text-center shadow-sm">
+                  <Eraser size={24} className="text-amber-500 mb-2" />
+                  <h4 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">Modal CPU (Extraction)</h4>
+                  <p className="text-xs text-zinc-500 mt-2">Isolated microservice running <code>isnet-anime</code> for instant, precise background removal.</p>
                 </div>
               </div>
+            </div>
 
-              {/* Tier 3: The AI Muscles (From Orchestrator) */}
-              <div className="flex w-[40%] justify-between relative mt-2">
-                {/* Horizontal connection line for bottom tier */}
-                <div className="absolute top-0 w-full h-0.5 bg-zinc-200 dark:bg-zinc-700 -z-10"></div>
-                
-                <div className="flex flex-col items-center">
-                  <div className="h-8 w-0.5 bg-zinc-200 dark:bg-zinc-700 mb-2"></div>
-                  <DiagramNode icon={<Brain size={24} />} title="LLM Engine" tech="Groq Llama-3" color="amber" />
-                </div>
+          </div>
+        </div>
 
-                <div className="flex flex-col items-center">
-                  <div className="h-8 w-0.5 bg-zinc-200 dark:bg-zinc-700 mb-2"></div>
-                  <DiagramNode icon={<Cpu size={24} />} title="ComfyUI Pipeline" tech="Modal (SDXL GPU)" color="amber" />
-                </div>
+        {/* SECTION 2: DEEP DIVE DETAILS */}
+        <div className="space-y-16">
+          
+          {/* Security & Auth */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <ShieldCheck size={28} className="text-pink-500 dark:text-purple-400" />
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100" style={{ fontFamily: '"Fredoka", sans-serif' }}>Security & State</h2>
               </div>
-
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                The platform employs a zero-trust architecture. No backend resource can be accessed without cryptographic verification originating from the Edge.
+              </p>
+            </div>
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <DetailBlock 
+                icon={<Lock />} title="Edge Route Guards" 
+                desc="Next.js Middleware intercepts all protected route requests, ensuring a valid Supabase JWT is present in cookies before delivering React Server Components."
+              />
+              <DetailBlock 
+                icon={<Database />} title="Row Level Security" 
+                desc="PostgreSQL policies strictly isolate data. Users can only SELECT or UPDATE their own `profiles` row, making token spoofing mathematically impossible."
+              />
+              <DetailBlock 
+                icon={<Code2 />} title="Server-Side Deductions" 
+                desc="Tokens are NEVER deducted by the client browser. Token updates occur entirely within Next.js API Routes during the microservice handoff."
+              />
+              <DetailBlock 
+                icon={<Zap />} title="Rate Limiting" 
+                desc="Supabase inherently rate-limits Auth endpoints (emails, password resets) to prevent automated bot exhaustion attacks."
+              />
             </div>
           </div>
-        </div>
 
-        {/* SECTION 2: COMPREHENSIVE RUNDOWN */}
-        <div>
-          <h2 className="text-xl font-bold uppercase tracking-widest text-pink-400 dark:text-purple-400 mb-10 transition-colors">Infrastructure Deep Dive</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            <DetailCard 
-              number="01"
-              title="The Frontend Hub (Vercel)"
-              desc="Built on Next.js App Router, the frontend acts as the secure gatekeeper. Server-Side Rendering (SSR) checks user JWT cookies at the network edge before delivering pages. API proxy routes hide third-party URLs and orchestrate secure binary file transfers (like image uploads) without exposing backend infrastructure."
-            />
+          <hr className="border-pink-100 dark:border-zinc-800" />
 
-            <DetailCard 
-              number="02"
-              title="State & Security (Supabase)"
-              desc="Provides PostgreSQL infrastructure heavily fortified by Row Level Security (RLS). Beyond standard OAuth and email authentication, Supabase acts as the platform's ledger. The `profiles` table tracks token economies, ensuring API routes deduct tokens server-side to completely prevent client-side manipulation."
-            />
-
-            <DetailCard 
-              number="03"
-              title="The Orchestrator (Render)"
-              desc="A FastAPI application that serves as the traffic controller. It receives raw concepts from Vercel, formats inference requests for Groq, and dynamically injects the resulting data into massive JSON execution graphs. It handles long-polling connections (`/render-status`) to keep the frontend updated during 60-second GPU cold starts."
-            />
-
-            <DetailCard 
-              number="04"
-              title="Neural Reasoning (Groq)"
-              desc="Leverages the Llama-3 language model on custom LPUs (Language Processing Units) for lightning-fast inference. It takes a user's simple prompt and expands it into rich, logical backstory lore, while simultaneously translating the visual concepts into the highly specific, comma-separated Danbooru tags required by SDXL."
-            />
-
-            <DetailCard 
-              number="05"
-              title="Tensor Compute (Modal GPU)"
-              desc="Serverless Python containers attached to A10G or A100 GPUs. They remain asleep to save costs until triggered by Render. Once awake, they execute a headless ComfyUI environment, downloading specific Civitai Safetensors and LoRAs into VRAM dynamically based on the requested asset profile (Character, Weapon, etc.)."
-            />
-
-            <DetailCard 
-              number="06"
-              title="Isolated Microservices"
-              desc="Certain high-frequency tools bypass the Render Orchestrator entirely. The Magic Eraser relies on an isolated Modal container running the specialized `isnet-anime.onnx` model. Next.js streams binary `application/octet-stream` data directly to this container for sub-second background removal that doesn't block the main generative queue."
-            />
-
+          {/* AI Orchestration */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <Layers size={28} className="text-pink-500 dark:text-purple-400" />
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100" style={{ fontFamily: '"Fredoka", sans-serif' }}>AI Orchestration</h2>
+              </div>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                The heavy lifting is decentralized. Tasks are routed to specialized, serverless hardware optimized for the specific tensor math required.
+              </p>
+            </div>
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <DetailBlock 
+                icon={<Brain />} title="Groq Pipeline" 
+                desc="User concepts hit Groq's specialized LPUs. Utilizing Llama-3 70B, it expands short phrases into detailed Markdown lore and precise Danbooru visual tags in under 800ms."
+              />
+              <DetailBlock 
+                icon={<Workflow />} title="Dynamic ComfyUI Graph" 
+                desc="The Render orchestrator injects Groq's tags into a master ComfyUI JSON graph. It dynamically swaps `.safetensors` LoRAs depending on the requested asset profile."
+              />
+              <DetailBlock 
+                icon={<Cpu />} title="Cold Start Mitigation" 
+                desc="Modal GPUs scale to zero. When awoken, Render implements a polling loop to keep the client connection alive while the GPU loads 6GB of weights into VRAM."
+              />
+              <DetailBlock 
+                icon={<Eraser />} title="Model Baking (U-2-Net)" 
+                desc="The background removal service downloads the `isnet-anime.onnx` weights during the container build phase, ensuring instant inference at runtime."
+              />
+            </div>
           </div>
+
+          <hr className="border-pink-100 dark:border-zinc-800" />
+
+          {/* Data Schema */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-12">
+            <div className="md:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <HardDrive size={28} className="text-pink-500 dark:text-purple-400" />
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100" style={{ fontFamily: '"Fredoka", sans-serif' }}>Database Schema</h2>
+              </div>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                A lightweight footprint leveraging Supabase for structured data and browser `localStorage` for high-speed client asset caching.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden font-mono text-sm shadow-xl">
+                <div className="bg-zinc-950 px-4 py-2 border-b border-zinc-800 flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                </div>
+                <div className="p-6 text-zinc-300 space-y-4">
+                  <div>
+                    <span className="text-pink-400">Table:</span> profiles
+                    <br/>
+                    <span className="text-zinc-500">-- Linked via trigger to auth.users</span>
+                    <ul className="pl-4 mt-1 space-y-1">
+                      <li><span className="text-blue-400">id</span>: uuid (PK)</li>
+                      <li><span className="text-blue-400">email</span>: text</li>
+                      <li><span className="text-blue-400">tokens</span>: integer (Default: 5)</li>
+                      <li><span className="text-blue-400">created_at</span>: timestamp</li>
+                    </ul>
+                  </div>
+                  <div className="pt-4 border-t border-zinc-800">
+                    <span className="text-emerald-400">Client-Side Cache:</span> localStorage['aiStudioHistory']
+                    <br/>
+                    <span className="text-zinc-500">-- Prevents DB bloat from heavy Base64 strings</span>
+                    <ul className="pl-4 mt-1 space-y-1">
+                      <li><span className="text-blue-400">id</span>: string (Render Job ID)</li>
+                      <li><span className="text-blue-400">theme</span>: string (User Concept)</li>
+                      <li><span className="text-blue-400">lore</span>: string (Groq Output)</li>
+                      <li><span className="text-blue-400">images</span>: array[string] (Base64)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
@@ -140,44 +241,22 @@ export default function ArchitecturePage() {
   );
 }
 
-// Helper Components
+// Micro-components for cleaner code
 
-function DiagramNode({ icon, title, tech, color }: { icon: React.ReactNode, title: string, tech: string, color: 'pink' | 'green' | 'blue' | 'purple' | 'amber' }) {
-  const colorStyles = {
-    pink: "bg-pink-100 dark:bg-pink-900/30 text-pink-500 border-pink-200 dark:border-pink-800",
-    green: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 border-emerald-200 dark:border-emerald-800",
-    blue: "bg-blue-100 dark:bg-blue-900/30 text-blue-500 border-blue-200 dark:border-blue-800",
-    purple: "bg-purple-100 dark:bg-purple-900/30 text-purple-500 border-purple-200 dark:border-purple-800",
-    amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-500 border-amber-200 dark:border-amber-800",
-  };
-
+function Badge({ text }: { text: string }) {
   return (
-    <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex flex-col items-center text-center w-56 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 z-10">
-      <div className={`p-3 rounded-xl mb-3 border ${colorStyles[color]} transition-colors`}>
-        {icon}
-      </div>
-      <h3 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm mb-1 transition-colors">{title}</h3>
-      <span className="text-[10px] bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded-md uppercase tracking-widest font-semibold transition-colors">
-        {tech}
-      </span>
-    </div>
+    <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded-md uppercase tracking-widest font-bold border border-zinc-200 dark:border-zinc-700">
+      {text}
+    </span>
   );
 }
 
-function DetailCard({ number, title, desc }: { number: string, title: string, desc: string }) {
+function DetailBlock({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
   return (
-    <div className="bg-white dark:bg-zinc-900/90 border border-pink-100 dark:border-purple-500/30 rounded-3xl p-8 shadow-sm hover:shadow-[0_8px_30px_rgba(244,114,182,0.08)] dark:hover:shadow-[0_8px_30px_rgba(168,85,247,0.08)] transition-all duration-300">
-      <div className="flex items-center gap-4 mb-4">
-        <span className="text-3xl font-bold text-pink-200 dark:text-purple-900/50 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-          {number}
-        </span>
-        <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors">
-          {title}
-        </h3>
-      </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed transition-colors">
-        {desc}
-      </p>
+    <div className="bg-white dark:bg-zinc-900/90 border border-pink-100 dark:border-purple-500/30 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="text-pink-400 dark:text-purple-400 mb-3">{icon}</div>
+      <h4 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm mb-2">{title}</h4>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{desc}</p>
     </div>
   );
 }
