@@ -188,49 +188,55 @@ export default function ArchitecturePage() {
 
           <hr className="border-pink-100 dark:border-zinc-800" />
 
-          {/* Data Schema */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-12">
-            <div className="md:col-span-1">
+          {/* Data Schema & Storage */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
+            
+            <div className="lg:col-span-1">
               <div className="flex items-center gap-3 mb-4">
                 <HardDrive size={28} className="text-pink-500 dark:text-purple-400" />
-                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100" style={{ fontFamily: '"Fredoka", sans-serif' }}>Database Schema</h2>
+                <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100" style={{ fontFamily: '"Fredoka", sans-serif' }}>Hybrid Storage</h2>
               </div>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                A lightweight footprint leveraging Supabase for structured data and browser `localStorage` for high-speed client asset caching.
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-6">
+                Flufforia uses a split-storage strategy. Secure, relational data lives in the cloud, while heavy Base64 image payloads are cached locally on the user's device to completely eliminate database bloat and bandwidth costs.
               </p>
             </div>
-            <div className="md:col-span-2">
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden font-mono text-sm shadow-xl">
-                <div className="bg-zinc-950 px-4 py-2 border-b border-zinc-800 flex gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                </div>
-                <div className="p-6 text-zinc-300 space-y-4">
+
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              
+              {/* Cloud Database Card */}
+              <div className="bg-white dark:bg-zinc-900/90 border border-emerald-100 dark:border-emerald-900/30 rounded-[2rem] overflow-hidden shadow-sm flex flex-col transition-colors">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-5 border-b border-emerald-100 dark:border-emerald-900/30 flex items-center gap-3 transition-colors">
+                  <Database size={20} className="text-emerald-500 dark:text-emerald-400" />
                   <div>
-                    <span className="text-pink-400">Table:</span> profiles
-                    <br/>
-                    <span className="text-zinc-500">-- Linked via trigger to auth.users</span>
-                    <ul className="pl-4 mt-1 space-y-1">
-                      <li><span className="text-blue-400">id</span>: uuid (PK)</li>
-                      <li><span className="text-blue-400">email</span>: text</li>
-                      <li><span className="text-blue-400">tokens</span>: integer (Default: 5)</li>
-                      <li><span className="text-blue-400">created_at</span>: timestamp</li>
-                    </ul>
+                    <h3 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">Supabase PostgreSQL</h3>
+                    <p className="text-[10px] uppercase tracking-widest text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">Table: profiles</p>
                   </div>
-                  <div className="pt-4 border-t border-zinc-800">
-                    <span className="text-emerald-400">Client-Side Cache:</span> localStorage['aiStudioHistory']
-                    <br/>
-                    <span className="text-zinc-500">-- Prevents DB bloat from heavy Base64 strings</span>
-                    <ul className="pl-4 mt-1 space-y-1">
-                      <li><span className="text-blue-400">id</span>: string (Render Job ID)</li>
-                      <li><span className="text-blue-400">theme</span>: string (User Concept)</li>
-                      <li><span className="text-blue-400">lore</span>: string (Groq Output)</li>
-                      <li><span className="text-blue-400">images</span>: array[string] (Base64)</li>
-                    </ul>
-                  </div>
+                </div>
+                <div className="p-5 flex-1 flex flex-col gap-3">
+                  <SchemaRow name="id" type="uuid (PK)" desc="Linked to auth.users" />
+                  <SchemaRow name="email" type="text" desc="User contact" />
+                  <SchemaRow name="tokens" type="integer" desc="Ledger (Default: 5)" />
+                  <SchemaRow name="created_at" type="timestamp" desc="Account creation" />
                 </div>
               </div>
+
+              {/* Local Storage Card */}
+              <div className="bg-white dark:bg-zinc-900/90 border border-blue-100 dark:border-blue-900/30 rounded-[2rem] overflow-hidden shadow-sm flex flex-col transition-colors">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-5 border-b border-blue-100 dark:border-blue-900/30 flex items-center gap-3 transition-colors">
+                  <HardDrive size={20} className="text-blue-500 dark:text-blue-400" />
+                  <div>
+                    <h3 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm">Browser Cache</h3>
+                    <p className="text-[10px] uppercase tracking-widest text-blue-600 dark:text-blue-400 font-semibold mt-0.5">localStorage['aiStudioHistory']</p>
+                  </div>
+                </div>
+                <div className="p-5 flex-1 flex flex-col gap-3">
+                  <SchemaRow name="id" type="string" desc="Render Job ID" />
+                  <SchemaRow name="theme" type="string" desc="User Concept" />
+                  <SchemaRow name="lore" type="string" desc="Groq Markdown" />
+                  <SchemaRow name="images" type="array[string]" desc="Base64 Payloads" />
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -257,6 +263,18 @@ function DetailBlock({ icon, title, desc }: { icon: React.ReactNode, title: stri
       <div className="text-pink-400 dark:text-purple-400 mb-3">{icon}</div>
       <h4 className="font-bold text-zinc-800 dark:text-zinc-100 text-sm mb-2">{title}</h4>
       <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function SchemaRow({ name, type, desc }: { name: string, type: string, desc: string }) {
+  return (
+    <div className="flex flex-col pb-3 border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 last:pb-0 transition-colors">
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-zinc-300 transition-colors">{name}</span>
+        <span className="font-mono text-xs text-pink-500 dark:text-purple-400 transition-colors">{type}</span>
+      </div>
+      <span className="text-xs text-zinc-500 dark:text-zinc-500 transition-colors">{desc}</span>
     </div>
   );
 }
