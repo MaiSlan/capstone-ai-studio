@@ -22,7 +22,6 @@ export default function FlufforiaStudio() {
   const supabase = createClient();
 
   const [user, setUser] = useState<any>(null);
-  
   const [isAuthenticating, setIsAuthenticating] = useState(true);
 
   const [phase, setPhase] = useState<number>(1);
@@ -39,9 +38,13 @@ export default function FlufforiaStudio() {
   const [error, setError] = useState<string | null>(null);
   const [gpuStatus, setGpuStatus] = useState<'Standby' | 'Waking' | 'Active'>('Standby');
   const gpuTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // New state for inline background removal
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+
+  // Refs for auto-resizing textareas
+  const themeRef = useRef<HTMLTextAreaElement>(null);
+  const appearanceRef = useRef<HTMLTextAreaElement>(null);
+  const backstoryRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -58,11 +61,28 @@ export default function FlufforiaStudio() {
       setIsAuthenticating(false); 
     };
     init();
-  }, [router]); 
+  }, [router, supabase]); 
 
-  const handleDraftLore = async (e?: React.FormEvent) => {
+  // Auto-resize logic
+  const resizeTextarea = (el: HTMLTextAreaElement | null) => {
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    if (phase === 1) resizeTextarea(themeRef.current);
+    if (phase === 2) {
+      resizeTextarea(appearanceRef.current);
+      resizeTextarea(backstoryRef.current);
+    }
+    if (phase === 3) resizeTextarea(promptRef.current);
+  }, [phase, appearancePart, backstoryPart, optimizedPrompt, theme]);
+
+  const handleDraftLore = async (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) e.preventDefault();
-    if (!theme.trim()) return;
+    if (!theme.trim() || loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -76,10 +96,7 @@ export default function FlufforiaStudio() {
       
       setLore(data.lore);
       
-      // Clean out markdown headers the AI might have injected
       const cleanLore = data.lore.replace(/\*\*(Visual Appearance|Character Backstory|Backstory):\*\*/ig, '').trim();
-      
-      // Try double newline first, fallback to single newline
       let parts = cleanLore.split('\n\n');
       if (parts.length === 1 && cleanLore.includes('\n')) {
         parts = cleanLore.split('\n');
@@ -97,7 +114,7 @@ export default function FlufforiaStudio() {
   };
 
   const handleOptimizeTags = async () => {
-    if (!lore.trim()) return;
+    if (!lore.trim() || loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -118,7 +135,7 @@ export default function FlufforiaStudio() {
   };
 
   const handleRenderImage = async () => {
-    if (!optimizedPrompt.trim()) return;
+    if (!optimizedPrompt.trim() || loading) return;
     
     const { data: { session } } = await supabase.auth.getSession();
     const jwtToken = session?.access_token;
@@ -199,7 +216,6 @@ export default function FlufforiaStudio() {
     setError(null);
 
     try {
-      // Convert current base64 image into a Blob
       const resBase64 = await fetch(`data:image/png;base64,${characterData.images[0]}`);
       const blob = await resBase64.blob();
       
@@ -216,18 +232,15 @@ export default function FlufforiaStudio() {
         throw new Error(errData.error || "Engine failed to remove background.");
       }
 
-      // Read transparent blob back to base64
       const resultBlob = await res.blob();
       const reader = new FileReader();
       reader.readAsDataURL(resultBlob);
       reader.onloadend = () => {
         const base64data = (reader.result as string).split(',')[1];
         
-        // Update the current state
         const updatedData = { ...characterData, images: [base64data] };
         setCharacterData(updatedData);
 
-        // Update local storage history
         const savedHistory = JSON.parse(localStorage.getItem('aiStudioHistory') || '[]');
         const updatedHistory = savedHistory.map((item: CharacterData) => 
           item.id === characterData.id ? updatedData : item
@@ -264,11 +277,18 @@ export default function FlufforiaStudio() {
     setError(null);
   };
 
+  // Keyboard shortcut handler
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, action: () => void) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      action();
+    }
+  };
+
   if (isAuthenticating) {
     return <div className="min-h-screen bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700"></div>;
   }
 
-  // Checkerboard pattern to show transparency perfectly
   const checkerboardBg = {
     backgroundImage: `
       linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%), 
@@ -283,10 +303,10 @@ export default function FlufforiaStudio() {
   return (
     <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 flex flex-col items-center justify-center p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
       
-      {/* THE MORPHING CARD */}
+      {/* THE MORPHING CARD: Widened to max-w-4xl for Phases 2 & 3 */}
       <div className={`
         bg-white dark:bg-zinc-900/90 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] border border-pink-100 dark:border-purple-500/30 overflow-hidden relative transition-all duration-700 ease-in-out
-        ${phase === 1 ? 'max-w-xl w-full' : phase === 4 ? 'max-w-3xl w-full' : 'max-w-2xl w-full'}
+        ${phase === 1 ? 'max-w-xl w-full' : phase === 4 ? 'max-w-3xl w-full' : 'max-w-4xl w-full'}
       `}>
         
         {/* INNER GPU STATUS PILL */}
@@ -306,7 +326,7 @@ export default function FlufforiaStudio() {
             </div>
           )}
 
-          {/* ... PHASES 1-3 REMAIN IDENTICAL ... */}
+          {/* PHASE 1: DRAFT CONCEPT */}
           {phase === 1 && (
             <form onSubmit={handleDraftLore} className="flex flex-col items-center text-center space-y-6 animate-fade-in mt-4">
               <div className="h-16 w-16 rounded-full bg-pink-100 dark:bg-purple-900/50 text-pink-500 dark:text-purple-400 flex items-center justify-center mb-2 shadow-inner transition-colors">
@@ -317,18 +337,21 @@ export default function FlufforiaStudio() {
                 <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm transition-colors">Describe the character you want to bring to life. Keep it simple!</p>
               </div>
               <textarea
+                ref={themeRef}
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, handleDraftLore)}
                 placeholder="e.g. A cute witch with an oversized hat..."
-                className="w-full h-32 bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-pink-300 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-zinc-900 transition-colors resize-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                className="w-full min-h-[128px] bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-pink-300 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-zinc-900 transition-colors resize-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 overflow-hidden"
               />
               <button type="submit" disabled={!theme.trim() || loading} className="w-full bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:shadow-[0_2px_0_rgba(244,114,182,0.4)] hover:translate-y-[2px]">
                 {loading ? <Loader2 size={20} className="animate-spin" /> : <Wand2 size={20} />}
-                {loading ? 'Drafting Magic...' : 'Generate Lore (Free)'}
+                {loading ? 'Drafting Magic...' : 'Generate Lore (Press Enter)'}
               </button>
             </form>
           )}
 
+          {/* PHASE 2: SYSTEM LORE */}
           {phase === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 transition-colors">
@@ -337,29 +360,46 @@ export default function FlufforiaStudio() {
                 </h2>
               </div>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">Review and adjust the AI-generated backstory and appearance.</p>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col h-full">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Visual Appearance</label>
                   <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors flex-1">
-                    <textarea value={appearancePart} onChange={(e) => setAppearancePart(e.target.value)} disabled={loading} className="w-full h-full min-h-[150px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
+                    <textarea 
+                      ref={appearanceRef}
+                      value={appearancePart} 
+                      onChange={(e) => setAppearancePart(e.target.value)} 
+                      onKeyDown={(e) => handleKeyDown(e, handleOptimizeTags)}
+                      disabled={loading} 
+                      className="w-full min-h-[250px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 resize-none transition-colors overflow-hidden leading-relaxed" 
+                    />
                   </div>
                 </div>
                 <div className="flex flex-col h-full">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2 pl-1 transition-colors">Character Backstory</label>
                   <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-1 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors flex-1">
-                    <textarea value={backstoryPart} onChange={(e) => setBackstoryPart(e.target.value)} disabled={loading} className="w-full h-full min-h-[150px] bg-transparent p-3 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 custom-scrollbar resize-none transition-colors" />
+                    <textarea 
+                      ref={backstoryRef}
+                      value={backstoryPart} 
+                      onChange={(e) => setBackstoryPart(e.target.value)} 
+                      onKeyDown={(e) => handleKeyDown(e, handleOptimizeTags)}
+                      disabled={loading} 
+                      className="w-full min-h-[250px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 resize-none transition-colors overflow-hidden leading-relaxed" 
+                    />
                   </div>
                 </div>
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setPhase(1)} disabled={loading} className="px-6 py-4 rounded-2xl font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50">Back</button>
                 <button onClick={handleOptimizeTags} disabled={loading} className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]">
-                  {loading ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : <>Generate Tags (Free) <ArrowRight size={18} /></>}
+                  {loading ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : <>Generate Tags (Press Enter) <ArrowRight size={18} /></>}
                 </button>
               </div>
             </div>
           )}
 
+          {/* PHASE 3: CLOUD TAGS */}
           {phase === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 transition-colors">
@@ -368,23 +408,31 @@ export default function FlufforiaStudio() {
                 </h2>
               </div>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">These are the precise ComfyUI instructions. Adjust if needed.</p>
+              
               <div className="bg-zinc-50 dark:bg-zinc-950 rounded-2xl p-2 border border-zinc-100 dark:border-zinc-800 shadow-inner transition-colors">
-                <textarea value={optimizedPrompt} onChange={(e) => setOptimizedPrompt(e.target.value)} disabled={loading} className="w-full min-h-[200px] bg-transparent p-4 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 font-mono custom-scrollbar resize-none transition-colors" />
+                <textarea 
+                  ref={promptRef}
+                  value={optimizedPrompt} 
+                  onChange={(e) => setOptimizedPrompt(e.target.value)} 
+                  onKeyDown={(e) => handleKeyDown(e, handleRenderImage)}
+                  disabled={loading} 
+                  className="w-full min-h-[300px] bg-transparent p-5 text-sm focus:outline-none disabled:opacity-50 text-zinc-700 dark:text-zinc-300 font-mono resize-none transition-colors overflow-hidden leading-relaxed" 
+                />
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setPhase(2)} disabled={loading} className="px-6 py-4 rounded-2xl font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50">Back</button>
                 <button onClick={handleRenderImage} disabled={loading} className="flex-1 bg-pink-400 dark:bg-purple-600 hover:bg-pink-500 dark:hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_0_rgba(244,114,182,0.4)] dark:shadow-[0_4px_0_rgba(147,51,234,0.4)] hover:translate-y-[2px]">
-                  {loading ? <><Loader2 size={18} className="animate-spin" /> {loadingMessage || 'Processing...'}</> : <>Render Asset (1 Token) <ArrowRight size={18} /></>}
+                  {loading ? <><Loader2 size={18} className="animate-spin" /> {loadingMessage || 'Processing...'}</> : <>Render Asset (Press Enter) <ArrowRight size={18} /></>}
                 </button>
               </div>
             </div>
           )}
 
-          {/* PHASE 4: FINAL SHOWCASE - UPDATED WITH BG REMOVER */}
+          {/* PHASE 4: FINAL SHOWCASE */}
           {phase === 4 && characterData?.images?.[0] && (
             <div className="animate-fade-in -m-8 md:-m-10 relative group">
               
-              {/* TOP LEFT: Remove Background Tool */}
               <button 
                 onClick={handleInlineBgRemove}
                 disabled={isRemovingBg}
@@ -394,7 +442,6 @@ export default function FlufforiaStudio() {
                 {isRemovingBg ? 'Removing...' : 'Remove BG (1 Token)'}
               </button>
 
-              {/* TOP RIGHT: View Details */}
               <Link 
                 href="/creations" 
                 className="absolute top-6 right-6 z-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur hover:bg-white dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-semibold px-4 py-2 rounded-full shadow-lg transition-all flex items-center gap-2 text-sm opacity-90 hover:opacity-100 transform hover:scale-105"
@@ -403,7 +450,6 @@ export default function FlufforiaStudio() {
                 View Details
               </Link>
 
-              {/* IMAGE SHOWCASE */}
               <div className="w-full aspect-square bg-zinc-50 dark:bg-zinc-950 relative border-b border-pink-100 dark:border-zinc-800 transition-colors" style={checkerboardBg}>
                 <img 
                   src={`data:image/png;base64,${characterData.images[0]}`} 
@@ -412,7 +458,6 @@ export default function FlufforiaStudio() {
                 />
               </div>
 
-              {/* ACTIONS */}
               <div className="p-6 md:p-8 bg-white dark:bg-zinc-900/90 flex flex-col sm:flex-row gap-4 transition-colors">
                 <button 
                   onClick={startOver} 
