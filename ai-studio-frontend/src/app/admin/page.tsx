@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Shield, Users, Coins, Edit2, Check, X, Trash2, 
-  Activity, List, LayoutDashboard, Terminal, Cpu, DollarSign
+  Activity, List, LayoutDashboard, Terminal, Cpu, ArrowUpDown, Calendar
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
@@ -42,6 +42,10 @@ export default function AdminDashboard() {
   const [editTokenValue, setEditTokenValue] = useState<number>(0);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
+  // Ledger Filters
+  const [ledgerTimeframe, setLedgerTimeframe] = useState<'month' | 'week' | 'day'>('month');
+  const [ledgerSort, setLedgerSort] = useState<'newest' | 'oldest'>('newest');
+  
   const supabase = createClient();
   const router = useRouter();
 
@@ -64,11 +68,13 @@ export default function AdminDashboard() {
       const { count } = await supabase.from('generations').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth);
       setMonthlyCompute(count || 0);
 
-      // Global Ledger
+      // Global Ledger (Fetch exactly the last 30 days to act as our maximum boundary)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const { data: ledgerData } = await supabase.from('generations')
         .select('id, theme, lore, optimized_prompt, created_at, profiles(email)')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .order('created_at', { ascending: false });
       if (ledgerData) setGenerations(ledgerData as any);
 
       // Groq Daily Tokens
@@ -157,10 +163,23 @@ export default function AdminDashboard() {
   const spendPercentage = Math.min((financialSpend / BUDGET_LIMIT) * 100, 100);
   const spendColor = spendPercentage > 90 ? 'text-red-500' : spendPercentage > 75 ? 'text-amber-500' : 'text-green-500';
   
-  // Donut Chart SVG Math
-  const donutRadius = 60;
+  // Adjusted Donut Chart SVG Math (Slightly smaller)
+  const donutRadius = 50; 
   const donutCircumference = 2 * Math.PI * donutRadius;
   const donutOffset = donutCircumference - (spendPercentage / 100) * donutCircumference;
+
+  // Filter & Sort Ledger Data
+  const filteredGenerations = generations.filter(gen => {
+    const genDate = new Date(gen.created_at);
+    const now = new Date();
+    if (ledgerTimeframe === 'day') return (now.getTime() - genDate.getTime()) <= 86400000;
+    if (ledgerTimeframe === 'week') return (now.getTime() - genDate.getTime()) <= 7 * 86400000;
+    return true; // month
+  }).sort((a, b) => {
+    const timeA = new Date(a.created_at).getTime();
+    const timeB = new Date(b.created_at).getTime();
+    return ledgerSort === 'newest' ? timeB - timeA : timeA - timeB;
+  });
 
   return (
     <div className="min-h-screen pt-24 pb-12 bg-[#FFFAF0] dark:bg-zinc-950 transition-colors duration-700 p-6 bg-[repeating-linear-gradient(to_right,transparent,transparent_40px,rgba(251,113,133,0.03)_40px,rgba(251,113,133,0.03)_80px)] dark:bg-[linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b),linear-gradient(45deg,#18181b_25%,transparent_25%,transparent_75%,#18181b_75%,#18181b)] dark:bg-[length:20px_20px] dark:bg-[position:0_0,10px_10px]">
@@ -180,30 +199,30 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* UNIFIED TELEMETRY DASHBOARD */}
-        <div className="bg-white dark:bg-zinc-900/90 rounded-[2.5rem] border border-pink-100 dark:border-purple-500/30 p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] mb-10 transition-colors">
-          <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-8 flex items-center gap-3 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-            <Activity className="text-pink-500 dark:text-purple-400" size={24} />
+        {/* UNIFIED TELEMETRY DASHBOARD (Slightly reduced padding and gaps) */}
+        <div className="bg-white dark:bg-zinc-900/90 rounded-[2rem] border border-pink-100 dark:border-purple-500/30 p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] mb-10 transition-colors">
+          <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-6 flex items-center gap-3 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+            <Activity className="text-pink-500 dark:text-purple-400" size={20} />
             System Telemetry & Economy
           </h2>
           
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center lg:items-stretch">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-center lg:items-stretch">
             
             {/* FOCUS: The Spend Donut Chart */}
-            <div className="flex flex-col items-center justify-center w-full lg:w-1/3 bg-zinc-50 dark:bg-zinc-950/50 rounded-[2rem] p-8 border border-zinc-100 dark:border-zinc-800 transition-colors">
+            <div className="flex flex-col items-center justify-center w-full lg:w-1/3 bg-zinc-50 dark:bg-zinc-950/50 rounded-[1.5rem] p-6 border border-zinc-100 dark:border-zinc-800 transition-colors">
               <div className="relative flex items-center justify-center">
                 {/* SVG Donut */}
-                <svg className="w-44 h-44 transform -rotate-90">
+                <svg className="w-36 h-36 transform -rotate-90">
                   {/* Background Track */}
                   <circle 
-                    cx="88" cy="88" r={donutRadius} 
-                    stroke="currentColor" strokeWidth="14" fill="transparent" 
+                    cx="72" cy="72" r={donutRadius} 
+                    stroke="currentColor" strokeWidth="12" fill="transparent" 
                     className="text-zinc-200 dark:text-zinc-800 transition-colors" 
                   />
                   {/* Progress Fill */}
                   <circle 
-                    cx="88" cy="88" r={donutRadius} 
-                    stroke="currentColor" strokeWidth="14" fill="transparent" 
+                    cx="72" cy="72" r={donutRadius} 
+                    stroke="currentColor" strokeWidth="12" fill="transparent" 
                     strokeDasharray={donutCircumference} 
                     strokeDashoffset={donutOffset} 
                     strokeLinecap="round" 
@@ -212,17 +231,17 @@ export default function AdminDashboard() {
                 </svg>
                 {/* Center Percentage */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors tracking-tighter" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                  <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 transition-colors tracking-tighter" style={{ fontFamily: '"Fredoka", sans-serif' }}>
                     {spendPercentage.toFixed(0)}%
                   </span>
                 </div>
               </div>
 
               {/* Legend */}
-              <div className="mt-6 text-center">
-                <div className="uppercase text-xs font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-1">Modal API Spend</div>
-                <div className="text-xl font-mono text-zinc-700 dark:text-zinc-300 transition-colors font-bold">
-                  ${financialSpend.toFixed(2)} <span className="text-sm text-zinc-400 font-normal">/ ${BUDGET_LIMIT.toFixed(2)}</span>
+              <div className="mt-4 text-center">
+                <div className="uppercase text-[10px] font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-1">Monthly Modal Spend</div>
+                <div className="text-lg font-mono text-zinc-700 dark:text-zinc-300 transition-colors font-bold">
+                  ${financialSpend.toFixed(2)} <span className="text-xs text-zinc-400 font-normal">/ ${BUDGET_LIMIT.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -231,33 +250,33 @@ export default function AdminDashboard() {
             <div className="flex-1 w-full flex flex-col justify-between gap-4">
               
               {/* Stat 1: Active Economy */}
-              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 flex items-center justify-between transition-colors">
+              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-[1.5rem] p-5 border border-zinc-100 dark:border-zinc-800 flex items-center justify-between transition-colors h-full">
                 <div>
                   <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 mb-1">
                     <Coins size={16} />
-                    <span className="text-xs font-bold uppercase tracking-widest">Active Economy</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Active Economy</span>
                   </div>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500">Unspent user tokens</p>
                 </div>
-                <div className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
-                  {totalTokens} <span className="text-lg text-pink-500 dark:text-purple-400">Tokens</span>
+                <div className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
+                  {totalTokens} <span className="text-sm text-pink-500 dark:text-purple-400">Tokens</span>
                 </div>
               </div>
 
               {/* Stat 2: Groq Tokens */}
-              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors">
-                <div className="flex justify-between items-end mb-3">
+              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-[1.5rem] p-5 border border-zinc-100 dark:border-zinc-800 transition-colors h-full flex flex-col justify-center">
+                <div className="flex justify-between items-end mb-2">
                   <div>
                     <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 mb-1">
                       <Terminal size={16} />
-                      <span className="text-xs font-bold uppercase tracking-widest">Groq API (Today)</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Groq API (Today)</span>
                     </div>
-                    <div className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
-                      {dailyGroqTokens.toLocaleString()} <span className="text-sm font-normal text-zinc-400">/ 100k limit</span>
+                    <div className="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
+                      {dailyGroqTokens.toLocaleString()} <span className="text-xs font-normal text-zinc-400">/ 100k limit</span>
                     </div>
                   </div>
                 </div>
-                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className={`h-full transition-all duration-700 ${dailyGroqTokens > 90000 ? 'bg-red-500' : dailyGroqTokens > 75000 ? 'bg-amber-500' : 'bg-pink-400 dark:bg-purple-500'}`}
                     style={{ width: `${Math.min((dailyGroqTokens / 100000) * 100, 100)}%` }}
@@ -266,19 +285,19 @@ export default function AdminDashboard() {
               </div>
 
               {/* Stat 3: Internal Compute */}
-              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors">
-                <div className="flex justify-between items-end mb-3">
+              <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-[1.5rem] p-5 border border-zinc-100 dark:border-zinc-800 transition-colors h-full flex flex-col justify-center">
+                <div className="flex justify-between items-end mb-2">
                   <div>
                     <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 mb-1">
                       <Cpu size={16} />
-                      <span className="text-xs font-bold uppercase tracking-widest">Cloud Compute (Monthly)</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Cloud Compute (Monthly)</span>
                     </div>
-                    <div className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
-                      {monthlyCompute} <span className="text-sm font-normal text-zinc-400">/ {MODAL_MONTHLY_LIMIT} generations</span>
+                    <div className="text-xl font-bold text-zinc-800 dark:text-zinc-100 tracking-tighter transition-colors">
+                      {monthlyCompute} <span className="text-xs font-normal text-zinc-400">/ {MODAL_MONTHLY_LIMIT} generations</span>
                     </div>
                   </div>
                 </div>
-                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className={`h-full transition-all duration-700 ${computePercentage > 90 ? 'bg-red-500' : computePercentage > 75 ? 'bg-amber-500' : 'bg-pink-400 dark:bg-purple-500'}`}
                     style={{ width: `${computePercentage}%` }}
@@ -406,42 +425,80 @@ export default function AdminDashboard() {
         {/* LEDGER TAB */}
         {activeTab === 'ledger' && (
           <div className="space-y-6">
-            {generations.length === 0 ? (
+            
+            {/* Filter Controls */}
+            <div className="flex justify-between items-center bg-white dark:bg-zinc-900/90 rounded-2xl p-4 border border-pink-100 dark:border-purple-500/30 shadow-sm transition-colors">
+              <div className="flex gap-2">
+                {(['day', 'week', 'month'] as const).map(t => (
+                  <button 
+                    key={t}
+                    onClick={() => setLedgerTimeframe(t)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors ${ledgerTimeframe === t ? 'bg-pink-100 dark:bg-purple-900/50 text-pink-600 dark:text-purple-300' : 'text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                  >
+                    {t === 'day' ? 'Last 24H' : t === 'week' ? 'Past 7 Days' : 'Last 30 Days'}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => setLedgerSort(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                className="flex items-center gap-2 px-4 py-2 bg-zinc-50 dark:bg-zinc-800 rounded-xl text-xs font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 hover:text-pink-500 dark:hover:text-purple-400 transition-colors"
+              >
+                <ArrowUpDown size={14} />
+                {ledgerSort === 'newest' ? 'Newest First' : 'Oldest First'}
+              </button>
+            </div>
+
+            {filteredGenerations.length === 0 ? (
               <div className="bg-white dark:bg-zinc-900/90 rounded-[2rem] border border-pink-100 dark:border-purple-500/30 p-16 text-center text-zinc-500 transition-colors">
-                No generations recorded yet.
+                No generations recorded in this timeframe.
               </div>
             ) : (
-              generations.map((gen) => (
-                <div key={gen.id} className="bg-white dark:bg-zinc-900/90 rounded-[2rem] border border-pink-100 dark:border-purple-500/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] transition-colors">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h3 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
-                        {gen.theme}
-                      </h3>
-                      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400 transition-colors">
-                        <span className="bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full font-mono text-xs text-pink-600 dark:text-purple-300 transition-colors">{gen.profiles?.email}</span>
-                        <span>•</span>
-                        <span className="font-medium">{new Date(gen.created_at).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
+              filteredGenerations.map((gen) => {
+                // Safely split the AI text into Appearance and Backstory
+                const parts = gen.lore.split('\n\n');
+                const appearance = parts[0]?.replace(/\*\*(Visual Appearance|Appearance):\*\*/ig, '').trim() || 'No appearance details provided.';
+                const backstory = parts.slice(1).join('\n\n')?.replace(/\*\*(Character Backstory|Backstory):\*\*/ig, '').trim() || 'No backstory provided.';
 
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors">
-                      <div className="uppercase text-[10px] font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-3 transition-colors">System Lore</div>
-                      <p className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed max-h-48 overflow-y-auto custom-scrollbar transition-colors pr-2">{gen.lore}</p>
-                    </div>
-                    <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors">
-                      <div className="uppercase text-[10px] font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-3 flex items-center gap-2 transition-colors">
-                        <Terminal size={14} /> Optimized Prompt
+                return (
+                  <div key={gen.id} className="bg-white dark:bg-zinc-900/90 rounded-[2rem] border border-pink-100 dark:border-purple-500/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(168,85,247,0.05)] transition-colors flex flex-col gap-6">
+                    
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-2 transition-colors" style={{ fontFamily: '"Fredoka", sans-serif' }}>
+                          {gen.theme}
+                        </h3>
+                        <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400 transition-colors">
+                          <span className="bg-pink-50 dark:bg-purple-900/30 px-3 py-1 rounded-full font-mono text-[10px] text-pink-600 dark:text-purple-300 transition-colors font-bold tracking-widest uppercase">{gen.profiles?.email}</span>
+                          <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(gen.created_at).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <p className="text-xs font-mono text-pink-600 dark:text-purple-300 leading-relaxed max-h-48 overflow-y-auto break-words custom-scrollbar transition-colors pr-2">
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors flex flex-col">
+                        <div className="uppercase text-[10px] font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-3 transition-colors">Visual Appearance</div>
+                        {/* Removed max height overflow to allow full view */}
+                        <p className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed transition-colors whitespace-pre-wrap">{appearance}</p>
+                      </div>
+                      <div className="bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 transition-colors flex flex-col">
+                        <div className="uppercase text-[10px] font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-3 transition-colors">Character Backstory</div>
+                        {/* Removed max height overflow to allow full view */}
+                        <p className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed transition-colors whitespace-pre-wrap">{backstory}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-pink-50/50 dark:bg-zinc-950/80 rounded-2xl p-5 border border-pink-100/50 dark:border-zinc-800 transition-colors">
+                      <div className="uppercase text-[10px] font-bold tracking-widest text-pink-400 dark:text-purple-400 mb-3 flex items-center gap-2 transition-colors">
+                        <Terminal size={14} /> Optimized Prompt Tags
+                      </div>
+                      <p className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 leading-relaxed break-words transition-colors">
                         {gen.optimized_prompt}
                       </p>
                     </div>
+
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
